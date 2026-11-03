@@ -2,15 +2,20 @@
 
 Recorded 3 November 2026. This report distinguishes local automated checks from hosted checks and device testing. A JavaScript export does not prove a native module compiles or a phone-to-phone call succeeds.
 
+See [the complete audit](COMPLETE_AUDIT.md) for prioritized findings, fixes, hosted configuration checks, and remaining release blockers.
+
 ## Automated checks
 
 | Check | Scope |
 | --- | --- |
 | `npm run lint` | Passed. Expo ESLint rules on application and test source. |
 | `npm run typecheck` | Passed. TypeScript, including pure domain tests. Deno Edge Function source is excluded from the app TypeScript project. |
-| `npm test` | 27 passing tests, including thirteen nested database scenarios. |
+| `npm test` | 29 passing tests, including thirteen nested database scenarios and chat reconnect pagination cases. |
 | `npm run test:backend` | Twelve passing checks against hosted Supabase: anonymous profile/chat/pet reads denied, anonymous pairing/chat/pet/date RPCs denied, calling endpoint returns 401 without user authentication. |
 | `npm run test:ui` | Passed sixteen browser scenarios in a fresh Playwright context, at desktop and 390/360px mobile widths; no runtime errors. |
+| `npm run test:client` | Eight browser regressions with mocked HTTP/Auth/media: session restoration, retry, account changes, chat gaps, cancelled calls, local sign-out, unpaired mode, and midnight. |
+| `npm run test:layout` | All sixteen routes pass the 360px layout scan with maximum-length names. |
+| `npm run test:config` | Expo introspection confirms Android camera/microphone permissions and iOS usage descriptions. |
 | `tests/hosted-features.sql` | Passed pairing, chat retry, care from both partners, date reconfirmation, and outsider isolation against the live schema. All temporary test identities/content rolled back. |
 | Expo export | Passed for web, Android, and iOS, including Android/iOS Hermes bytecode. Native build/signing is still pending. |
 

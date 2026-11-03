@@ -2,6 +2,8 @@
 
 A private shared space for two partners, nearby or far apart. Built with Expo SDK 57, React Native, Expo Router, and Supabase. This is a working **alpha**, with a local demo and a configured live backend. Its cherry and lavender theme includes small teddy and heart illustrations.
 
+The [complete audit](docs/COMPLETE_AUDIT.md) records confirmed fixes, privacy checks, verification results, and the remaining release blockers. This app is not yet ready for public launch.
+
 ## Try it
 
 The local browser preview runs at **http://localhost:8082**. Choose your distance setting, then **Explore our little world**. The demo badge lets you switch between both partners. Demo changes persist on this device; they are separate from live accounts.
@@ -78,14 +80,17 @@ Configure the two public Supabase variables in the selected Expo build environme
 npm run lint
 npm run typecheck
 npm test
+npm run test:config
 npm run test:backend
 npm run build:web
 npm run preview
 # In another terminal while the preview is running:
 npm run test:ui
+npm run test:client
+npm run test:layout
 ```
 
-`test:ui` uses an installed Chrome through Playwright and writes screenshots under `artifacts/`. `test:backend` makes only unauthenticated requests against the configured project. The database suite uses isolated PGlite PostgreSQL. The separate `tests/hosted-features.sql` integration check exercises real hosted policies and functions with three temporary identities in one transaction; it rolls back all test identities and content.
+The browser checks use an installed Chrome through Playwright and write evidence under `artifacts/`. `test:client` intercepts network requests and uses Auth/media doubles for failure cases; it does not create hosted users. `test:layout` checks every route with maximum-length names on a narrow phone. `test:config` inspects the effective native permissions after Expo config plugins run. `test:backend` makes only unauthenticated requests against the configured project. The database suite uses isolated PGlite PostgreSQL. The separate `tests/hosted-features.sql` integration check exercises real hosted policies and functions with three temporary identities in one transaction; it rolls back all test identities and content.
 
 - `src/app/`: routes and screens; `src/components/`: shared presentation.
 - `src/domain.ts`: game, quiz, date, and validation logic.

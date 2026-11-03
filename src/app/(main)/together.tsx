@@ -6,10 +6,11 @@ import { Button, C, Card, F, Page, S, SectionTitle, T } from '../../components/u
 import { usePeople, useSpace } from '../../store';
 import { questionFor, quizMatch, sharedDay } from '../../domain';
 import { PetPortrait } from '../../components/pet-portrait';
+import { useNow } from '../../use-now';
 
 export default function Together() {
   const { space, demo, userId } = useSpace(); const { me, partner } = usePeople(); const { width } = useWindowDimensions();
-  const day = sharedDay(space.timeZone); const todayGames = space.games.filter(g => g.finishedAt && sharedDay(space.timeZone, new Date(g.finishedAt)) === day);
+  const day = sharedDay(space.timeZone, new Date(useNow())); const todayGames = space.games.filter(g => g.finishedAt && sharedDay(space.timeZone, new Date(g.finishedAt)) === day);
   const mine = space.quizzes.find(q => q.authorId === userId && q.day === day); const theirs = space.quizzes.find(q => q.authorId !== userId && q.day === day); const match = mine && theirs ? quizMatch(mine.choices, theirs.choices) : null;
   const activities = [{ title: 'Our little canvas', subtitle: 'Make a beautiful mess together.', icon: PenLine, color: C.rose, route: '/draw', tag: 'CREATE TOGETHER' }, { title: 'Four in a Row', subtitle: 'A little friendly competition.', icon: Grid3X3, color: C.pale, route: '/game', tag: 'PLAY TOGETHER' }, { title: 'This or That', subtitle: 'Discover your little similarities.', icon: Heart, color: C.yellow, route: '/quiz', tag: 'GET TO KNOW US' }];
   return <Page title="Our kind of quality time." subtitle="A little laughter. A little creativity. A lot of us." eyebrow="TOGETHER, WHEREVER"><Card style={{ backgroundColor: C.green, borderColor: C.green, padding: 28 }}><View style={[S.between, { flexWrap: 'wrap', gap: 20 }]}><View style={{ gap: 8, flex: 1, minWidth: 200 }}><T kind="label" style={{ color: '#F3CFDE' }}>JUST A CALL AWAY</T><T kind="serif" style={{ color: '#fff' }}>Same time. Same little world.</T><T kind="small" style={{ color: '#F8E1EC' }}>Stay on a call while you play or draw.</T></View><Button title="Call your person" icon={Video} secondary onPress={() => router.push('/call')} /></View></Card>

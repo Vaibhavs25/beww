@@ -29,6 +29,7 @@ const profile = (id, name) => ({ id, display_name: name, mood: 'calm', mood_note
 const message = n => ({ id: `dddddddd-1111-4111-8111-${String(n).padStart(12, '0')}`, couple_id: coupleB, author_id: bob, body: `History message ${n}`, created_at: new Date(1793600000000 + n * 1000).toISOString() });
 let history = Array.from({ length: 150 }, (_, i) => message(i + 1));
 const bobReadEntered = deferred();
+let paired = true; let invitationMode;
 let holdSend = null; let holdBob = null; let holdAnswer = null;
 let sendStarted = false; let bobReadStarted = false; let answerStarted = false;
 let dropNextSend = false; let logoutScope; let incoming = null;
@@ -50,7 +51,8 @@ await context.route(`https://${host}/**`, async route => {
     if (id === bob && holdBob) { bobReadStarted = true; bobReadEntered.resolve(); await holdBob.promise; }
     return respond(url.searchParams.has('id') ? profile(id, id === alice ? 'Alice' : 'Bob') : [profile(partner, 'Partner'), profile(id, id === alice ? 'Alice' : 'Bob')]);
   }
-  if (table === 'couple_members') return respond({ couple_id: cid });
+  if (table === 'couple_members') return respond(paired ? { couple_id: cid } : null);
+  if (table === 'create_invite') { invitationMode = request.postDataJSON().relationship_mode; return respond({ code: '0123456789', expires_at: new Date(Date.now() + 600000).toISOString() }); }
   if (table === 'couples') return respond({ id: cid, mode: 'distance', time_zone: 'UTC', started_on: '2025-01-01' });
   if (table === 'pets') return respond(null);
   if (table === 'calls') return respond(incoming);
@@ -164,6 +166,17 @@ try {
   await page.getByRole('button', { name: 'Switch demo partner' }).waitFor();
   assert.equal(logoutScope, 'local');
   check('device sign-out requests local scope and removes live state');
+
+  paired = false;
+  await page.reload();
+  await page.getByRole('button', { name: 'Invite my partner' }).waitFor();
+  if (await page.getByRole('button', { name: 'Dismiss error' }).isVisible()) await page.getByRole('button', { name: 'Dismiss error' }).click();
+  await page.getByRole('button', { name: 'Nearby', exact: true }).click();
+  await page.getByRole('button', { name: 'Invite my partner' }).click();
+  await page.getByRole('button', { name: 'Create our invitation' }).click();
+  await page.getByText('0123456789', { exact: true }).waitFor();
+  assert.equal(invitationMode, 'nearby');
+  check('an unpaired live account can choose distance mode before creating an invitation');
 
   const midnight = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await midnight.routeWebSocket(`wss://${host}/**`, ws => ws.close());
