@@ -1,25 +1,36 @@
 {
   "expo": {
-    "name": "flat-407",
-    "slug": "flat-407",
+    "name": "Closer",
+    "slug": "closer-couples",
+    "scheme": "closercouples",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "app.closer.couples"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#EEE5F7",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "package": "app.closer.couples"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "Closer — your little world, together"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      ["@config-plugins/react-native-webrtc", { "cameraPermission": "Closer uses your camera when you choose a video call.", "microphonePermission": "Closer uses your microphone when you choose to call your partner." }],
+      ["expo-image-picker", { "photosPermission": "Choose a photo to share with your partner.", "cameraPermission": "Take a photo for your partner or make a video call.", "microphonePermission": "Closer uses your microphone when you choose to call your partner." }]
+    ]
   }
 }
