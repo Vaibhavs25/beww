@@ -21,13 +21,14 @@ For development, run `npm start`. Use `npx expo install <package>` when adding d
 | Experience | Behavior |
 | --- | --- |
 | Nearby or long-distance | Onboarding choice; change it later in Our space. |
-| Mood and support | Seven moods, a short note, and what would help. The partner's home adapts to the shared mood; it expires after 24 hours. |
+| Mood and support | Seven moods, a short note, and what would help. The partner's home reflects a check-in for 24 hours. Each partner has a seven-day mood strip and a daily check-in streak; editing today keeps one entry. |
 | Private chat | A dedicated Chat tab with text messages, timestamps, earlier-message loading, and retry without duplicate sends. Each partner speaks as their own account. |
 | A shared pet | Adopt a teddy, cat, puppy, or bunny; choose a name and raise it together. Feeding, play, and rest each earn five points once per partner per shared day. Every thirty points adds a level; no progress is lost for missed days. |
 | Photos and little moments | Pick or take a photo, send a note or hug, react with a heart, and keep a shared story. Images are resized and stored in a private bucket. |
+| Memory Lane | A horizontal photo album on the dashboard, showing shared photos from the last 30 days, with captions, a full-photo viewer, and earlier-photo loading. |
 | Drawing together | Shared canvas, six colors, brush sizes, eraser, undo your own mark, and save a drawing to the story. Unsent strokes can be retried. |
 | Four in a Row | Turns and wins validated on the server, with saved results and daily win counts. The demo supports passing one device between partners. |
-| Daily question | Each partner answers independently; the database hides the other answer until both have contributed. |
+| Daily question | A lavender prompt card on the dashboard rotates lighthearted questions each shared day. Each partner answers independently; the database hides the other answer until both have contributed. |
 | In-sync quiz | Five choices produce a match percentage after both answer. The percentage describes those answers, not how much someone loves their partner. |
 | Dates and milestones | Nearby/long-distance ideas, date, time, place or call link, notes, partner confirmation, editing, a someday list, and completed memories. Editing a plan requires the other partner to confirm the new version. Times use the couple's shared time zone. |
 | Accounts and invitations | Email/password accounts and single-use, ten-minute partner codes. Spaces have at most two members. |
@@ -47,8 +48,9 @@ Migration history:
 - `20261103095312_closer_access_games_calls.sql`: tighter access boundaries, validated game operations, and call signaling.
 - `20261103102801_private_operations_and_indexes.sql`: invitation records and internal operations moved to a private schema, with foreign-key indexes. Applied with the user's approval, preserving existing data.
 - `20261103134634_chat_pet_date_planning.sql`: private couple chat, shared pets and once-daily care, and date details/confirmations. Applied and verified against the hosted database; earlier data is preserved.
+- `20261104033303_daily_mood_history.sql`: partner-only daily mood history, server-owned check-in dates and streaks, and an index for the recent-photo album. Applied and verified against the hosted database.
 
-All exposed application tables use row-level security. Anonymous requests cannot read profiles or issue pairing RPCs. Public RPCs are invoker wrappers over restricted private operations. Photo links expire. This is access-controlled storage, **not end-to-end encryption**; project administrators retain backend access.
+All exposed application tables use row-level security. Anonymous requests cannot read profiles or issue pairing RPCs. Public RPCs use invoker privileges; privileged mutations delegate to restricted private operations. Photo links expire. This is access-controlled storage, **not end-to-end encryption**; project administrators retain backend access.
 
 `call-ice` explicitly validates the user's bearer token and two-person membership. Its gateway `verify_jwt` setting is false because authentication is enforced inside the function with `auth.getUser`; do not remove that check. It currently supplies STUN only. To enable a compatible coturn relay, configure server-side Edge Function secrets `TURN_URLS` (comma-separated `turn:`/`turns:` URLs) and `TURN_AUTH_SECRET`. Credentials are then generated with a one-hour expiry. [WebRTC reliability guidance](https://react-native-webrtc.github.io/handbook/guides/improving-call-reliability.html) explains why a relay is needed across restrictive networks.
 

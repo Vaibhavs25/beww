@@ -5,9 +5,10 @@ import type { Session } from '@supabase/supabase-js';
 import { cleanText, createDemo, makeId, validDate, dropPiece, newGame, sharedDay, QUIZ, type MoodId, type Space, type Moment, type Plan, type Stroke, type PetKind, type CareAction } from './domain';
 import { client, messageFrom, planFrom, readMessages, readSpace, supabase, writePhoto } from './lib/supabase';
 import { adoptPet as newPet, careForPet, mergeMessages, reconcileMessages, validatePlan, type PlanDraft } from './shared-features';
+import { logDemoMood } from './dashboard';
 
 const STORAGE_KEY = 'closer.demo.v2';
-function blankSpace(): Space { return { ...createDemo(), id: '', startedOn: '', profiles: [], moments: [], plans: [], answers: [], canvas: [], games: [], quizzes: [], messages: [], pet: null, petCare: [], featuresReady: false }; }
+function blankSpace(): Space { return { ...createDemo(), id: '', startedOn: '', profiles: [], moments: [], plans: [], answers: [], canvas: [], games: [], quizzes: [], messages: [], pet: null, petCare: [], featuresReady: false, moodHistory: null }; }
 type Connection = 'demo' | 'connecting' | 'live' | 'offline';
 type State = {
   space: Space; userId: string; demo: boolean; ready: boolean; busy: boolean; error: string; toast: string; connection: Connection; session: Session | null;
@@ -18,7 +19,7 @@ type State = {
   savePlan: (draft: PlanDraft, original?: Plan) => Promise<void>; togglePlan: (id: string) => Promise<void>; respondPlan: (plan: Plan, going: boolean) => Promise<void>;
   sendMessage: (text: string, id: string) => Promise<void>; loadEarlierMessages: () => Promise<void>;
   adoptPet: (name: string, kind: PetKind) => Promise<void>; carePet: (action: CareAction) => Promise<void>; renamePet: (name: string) => Promise<void>;
-  answer: (text: string) => Promise<void>; updateProfile: (name: string, start: string) => Promise<void>;
+  answer: (text: string, displayedDay: string) => Promise<void>; updateProfile: (name: string, start: string) => Promise<void>;
   switchPartner: () => void; resetDemo: () => Promise<void>; refresh: () => Promise<void>; signOut: () => Promise<void>;
   onboarded: boolean; setup: (mode: Space['mode'], name: string, partnerName: string) => Promise<void>;
   setMode: (mode: Space['mode']) => Promise<void>; addStroke: (stroke: Stroke) => Promise<void>; undoStroke: () => Promise<void>; saveCanvas: (title: string) => Promise<void>;
@@ -109,7 +110,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
     const channel = supabase!.channel(`space-${sessionId}`);
-    for (const table of ['profiles', 'couple_members', 'couples', 'moments', 'reactions', 'plans', 'daily_answers', 'canvas_strokes', 'games', 'quiz_answers', 'chat_messages', 'pets', 'pet_care']) {
+    for (const table of ['profiles', 'couple_members', 'couples', 'moments', 'reactions', 'plans', 'daily_answers', 'canvas_strokes', 'games', 'quiz_answers', 'chat_messages', 'pets', 'pet_care', 'mood_entries']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRefresh);
     }
     channel.subscribe(status => {
@@ -145,9 +146,13 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   };
   const setMood = async (mood: MoodId, note: string, need: string) => {
     if (note.length > 200) throw new Error('Keep your mood note under 200 characters.');
-    if (demo) mutateDemo(s => ({ ...s, profiles: s.profiles.map(p => p.id === userId ? { ...p, mood, moodNote: note.trim(), need, moodAt: new Date().toISOString() } : p) }));
-    else { await checked(client().from('profiles').update({ mood, mood_note: note.trim(), need, mood_updated_at: new Date().toISOString() }).eq('id', userId)); await refresh(); }
-    setToast(demo ? 'Mood updated in your demo space' : 'Your mood is shared');
+    const now = new Date();
+    if (demo) mutateDemo(s => ({ ...s,
+      profiles: s.profiles.map(p => p.id === userId ? { ...p, mood, moodNote: note.trim(), need, moodAt: now.toISOString() } : p),
+      moodHistory: logDemoMood(s.moodHistory, { authorId: userId, day: sharedDay(s.timeZone, now), mood, updatedAt: now.toISOString() }),
+    }));
+    else { await checked(client().rpc('log_mood', { feeling: mood, note: note.trim(), support: need })); await refresh(); }
+    if (identityVersion === identityEpoch.current) setToast(demo ? 'Today’s mood saved in your demo' : 'Today’s mood is shared');
   };
   const sendMoment = async (kind: Moment['kind'], text: string, photo?: string) => {
     requirePair();
@@ -207,8 +212,9 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
       await refresh();
     }
   };
-  const answer = async (text: string) => {
-    requirePair(); const body = cleanText(text); const day = sharedDay(current.timeZone);
+  const answer = async (text: string, displayedDay: string) => {
+    requirePair(); const body = cleanText(text); const day = displayedDay;
+    if (day !== sharedDay(current.timeZone)) throw new Error('A new day has started. Open today’s question and try again.');
     if (current.answers.some(a => a.day === day && a.authorId === userId)) throw new Error('You’ve already answered today. Come back tomorrow for a new question.');
     if (demo) mutateDemo(s => ({ ...s, answers: [...s.answers, { id: makeId(), authorId: userId, day, text: body }] }));
     else { await checked(client().from('daily_answers').insert({ couple_id: current.id, author_id: userId, day, body })); await refresh(); }

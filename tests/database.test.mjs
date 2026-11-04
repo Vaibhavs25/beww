@@ -140,6 +140,40 @@ test('database migrations and access boundaries', async t => {
     await as(outsider); assert.equal((await db.query('select * from public.plans')).rows.length,0);
     await assert.rejects(db.query('select public.save_plan($1,$2,2)',[plan.id,draft]),/Connect/);
   });
+  await t.test('daily moods use server identity and shared day, update once, and stay inside the couple',async () => {
+    await as(null,'anon'); await assert.rejects(db.query('select * from public.mood_entries'),/permission denied/);
+    await assert.rejects(db.query("select public.log_mood('happy')"),/permission denied/);
+    await assert.rejects(db.query('select public.get_mood_history()'),/permission denied/);
+    await as(a); const today = await scalar('select private.couple_today()::text');
+    await db.query("select public.log_mood('low','A quieter day','Just listen')");
+    await db.query("select public.log_mood('calm','Feeling calmer','Quiet time')");
+    const history = await scalar('select public.get_mood_history()');
+    assert.equal(history.entries.length,1); assert.equal(history.entries[0].day,today); assert.equal(history.entries[0].authorId,a); assert.equal(history.entries[0].mood,'calm');
+    assert.equal(history.streaks[0].days,1); assert.equal('note' in history.entries[0],false);
+    assert.equal(await scalar('select mood from public.profiles where id=$1',[a]),'calm');
+    await assert.rejects(db.query("select public.log_mood('happy',$1,'')",['x'.repeat(201)]),/200 characters/);
+    await assert.rejects(db.query("select public.log_mood('bogus')"),/available moods/);
+    assert.equal(await scalar('select mood from public.profiles where id=$1',[a]),'calm');
+    await assert.rejects(db.query("insert into public.mood_entries values($1,$2,current_date,'happy',now())",[cid,b]),/permission denied/);
+    await assert.rejects(db.query("update public.mood_entries set day=day+1"),/permission denied/);
+    await as(b); assert.equal((await scalar('select public.get_mood_history()')).entries.length,1);
+    await db.query("select public.log_mood('happy')"); assert.equal((await scalar('select public.get_mood_history()')).entries.length,2);
+    await as(outsider); assert.equal((await db.query('select * from public.mood_entries')).rows.length,0);
+    assert.deepEqual(await scalar('select public.get_mood_history()'),{entries:[],streaks:[]});
+  });
+  await t.test('mood history shows 30 days without truncating a longer streak and handles missed days',async () => {
+    await as(a); await db.exec('reset role');
+    await db.query("insert into public.mood_entries(couple_id,author_id,day,mood) select $1,$2,private.couple_today()-n,'low' from generate_series(0,44) n on conflict do nothing",[cid,a]);
+    await db.query("insert into public.mood_entries(couple_id,author_id,day,mood) values($1,$2,private.couple_today()+1,'happy')",[cid,a]);
+    await as(a); let history=await scalar('select public.get_mood_history()');
+    assert.equal(history.entries.filter(row=>row.authorId===a).length,30); assert.equal(history.streaks.find(row=>row.authorId===a).days,45);
+    await db.exec('reset role'); await db.query('delete from public.mood_entries where author_id=$1 and day=private.couple_today()',[a]);
+    await as(a); history=await scalar('select public.get_mood_history()'); assert.equal(history.streaks.find(row=>row.authorId===a).days,44);
+    await db.exec('reset role'); await db.query('delete from public.mood_entries where author_id=$1 and day=private.couple_today()-1',[a]);
+    await as(a); history=await scalar('select public.get_mood_history()'); assert.equal(history.streaks.some(row=>row.authorId===a),false);
+    assert.equal(history.streaks.find(row=>row.authorId===b).days,1);
+    await db.query("select public.log_mood('missing')"); history=await scalar('select public.get_mood_history()'); assert.equal(history.streaks.find(row=>row.authorId===a).days,1);
+  });
   await t.test('invalid invitation attempts are rate limited without rolling back the count',async () => {
     await as(outsider); let result;
     for(let i=0;i<11;i++) result=await scalar("select public.join_couple('0000000000')");

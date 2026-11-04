@@ -13,6 +13,9 @@ export const MOODS: Mood[] = [
 
 export const NEEDS = ['A hug', 'Just listen', 'Something fun', 'Quiet time', 'Nothing right now'];
 export type Profile = { id: string; name: string; mood: MoodId; moodNote: string; need: string; moodAt: string };
+export type MoodEntry = { authorId: string; day: string; mood: MoodId; updatedAt: string };
+export type MoodStreak = { authorId: string; days: number; lastDay: string };
+export type MoodHistory = { entries: MoodEntry[]; streaks: MoodStreak[] };
 export type Stroke = { id: string; authorId: string; color: string; width: number; points: number[][] };
 export type Moment = { id: string; authorId: string; kind: 'photo' | 'note' | 'hug' | 'drawing'; text: string; image?: string; drawing?: Stroke[]; storagePath?: string; createdAt: string; hearts: string[] };
 export type Plan = { id: string; authorId: string; title: string; date: string; kind: 'date' | 'wish'; done: boolean; time?: string; place?: string; notes?: string; format?: 'in-person' | 'virtual'; acceptedBy?: string[]; revision?: number };
@@ -24,7 +27,7 @@ export type PetCare = { authorId: string; day: string; action: CareAction; creat
 export type Answer = { id: string; authorId: string; day: string; text: string };
 export type Game = { id: string; players: string[]; board: number[]; turn: number; winner: number | null; status: 'playing' | 'finished'; createdAt: string; finishedAt: string | null };
 export type QuizAnswer = { authorId: string; day: string; choices: number[] };
-export type Space = { id: string; startedOn: string; mode: 'nearby' | 'distance'; timeZone: string; profiles: Profile[]; moments: Moment[]; plans: Plan[]; answers: Answer[]; canvas: Stroke[]; games: Game[]; quizzes: QuizAnswer[]; messages: ChatMessage[]; hasOlderMessages: boolean; pet: Pet | null; petCare: PetCare[]; featuresReady: boolean };
+export type Space = { id: string; startedOn: string; mode: 'nearby' | 'distance'; timeZone: string; profiles: Profile[]; moments: Moment[]; memoryPhotos: Moment[]; hasMoreMemories: boolean; plans: Plan[]; answers: Answer[]; canvas: Stroke[]; games: Game[]; quizzes: QuizAnswer[]; messages: ChatMessage[]; hasOlderMessages: boolean; pet: Pet | null; petCare: PetCare[]; featuresReady: boolean; moodHistory: MoodHistory | null };
 
 export const QUIZ = [
   { prompt: 'Our ideal little escape?', options: ['A cabin in the hills', 'A place by the sea'] },
@@ -57,7 +60,8 @@ export function dropPiece(game: Game, column: number, player: number): Game {
 export function quizMatch(a: number[], b: number[]) { if (a.length !== QUIZ.length || b.length !== QUIZ.length || [...a, ...b].some(x => x !== 0 && x !== 1)) return null; return Math.round(a.filter((x, i) => x === b[i]).length / QUIZ.length * 100); }
 export function strokePath(stroke: Stroke) { return stroke.points.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join(' '); }
 
-export const QUESTIONS = [
+// Keep earlier prompts stable so saved answers never acquire a different question.
+const ORIGINAL_QUESTIONS = [
   'What’s one tiny thing I do that makes you feel loved?',
   'If we had a whole day with no responsibilities, what would we do?',
   'Which memory of us would you like to live again?',
@@ -73,11 +77,31 @@ export const QUESTIONS = [
   'What’s something you appreciate about how we’ve grown?',
   'What does your ideal slow Sunday with me look like?',
 ];
+export const QUESTIONS = [
+  'If we opened a tiny café, what would we call it?',
+  'We have a free afternoon and no plans. Where are we going?',
+  'Which ordinary moment with me deserves its own movie scene?',
+  'What snack would you sneak into our next movie night?',
+  'If our relationship had a theme song today, what would it be?',
+  'Which of us would survive longer on a cooking show?',
+  'What silly little tradition should we start?',
+  'We can teleport anywhere for dinner. Where are we eating?',
+  'What would our pet say about us if they could talk?',
+  'What is one thing you want us to try just for the fun of it?',
+  'Design our perfect rainy Sunday in three words.',
+  'What tiny thing reminded you of me today?',
+  'Which photo of us would you put on a postcard?',
+  'If we swapped hobbies for a day, what would happen?',
+];
 
 export function dateKey(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 export function dayNumber(day: string) { const [y, m, d] = day.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 86400000); }
 export function daysTogether(start: string, today = dateKey()) { return Math.max(0, dayNumber(today) - dayNumber(start)); }
-export function questionFor(day: string) { return QUESTIONS[((dayNumber(day) % QUESTIONS.length) + QUESTIONS.length) % QUESTIONS.length]; }
+export function questionFor(day: string) {
+  const prompts = day < '2026-11-05' ? ORIGINAL_QUESTIONS : QUESTIONS;
+  const offset = day < '2026-11-05' ? 0 : dayNumber('2026-11-05');
+  return prompts[((dayNumber(day) - offset) % prompts.length + prompts.length) % prompts.length];
+}
 export function moodFor(id: string) { return MOODS.find(m => m.id === id) ?? MOODS[0]; }
 export function makeId() { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
 export function relativeTime(iso: string) {
@@ -108,7 +132,7 @@ export function createDemo(): Space {
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 3);
   const start = new Date(now); start.setDate(start.getDate() - 247);
   return {
-    id: 'demo', startedOn: dateKey(start), mode: 'distance', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata', canvas: [], games: [], quizzes: [], pet: null, petCare: [], featuresReady: true, hasOlderMessages: false,
+    id: 'demo', startedOn: dateKey(start), mode: 'distance', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata', canvas: [], games: [], quizzes: [], pet: null, petCare: [], featuresReady: true, hasOlderMessages: false, moodHistory: { entries: [], streaks: [] }, memoryPhotos: [], hasMoreMemories: false,
     messages: [
       { id: 'demo-chat-1', authorId: 'jamie', text: 'Hey you. What was the best little part of your day? 🌿', createdAt: new Date(now - 8 * 60000).toISOString() },
       { id: 'demo-chat-2', authorId: 'alex', text: 'Honestly? Having something to look forward to with you.', createdAt: new Date(now - 6 * 60000).toISOString() },

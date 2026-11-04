@@ -1,6 +1,6 @@
 # Alpha verification and release gaps
 
-Recorded 3 November 2026. This report distinguishes local automated checks from hosted checks and device testing. A JavaScript export does not prove a native module compiles or a phone-to-phone call succeeds.
+Updated 4 November 2026 for the [shared dashboard](SHARED_DASHBOARD.md). This report distinguishes local automated checks from hosted checks and device testing. A JavaScript export does not prove a native module compiles or a phone-to-phone call succeeds.
 
 See [the complete audit](COMPLETE_AUDIT.md) for prioritized findings, fixes, hosted configuration checks, and remaining release blockers.
 
@@ -10,24 +10,27 @@ See [the complete audit](COMPLETE_AUDIT.md) for prioritized findings, fixes, hos
 | --- | --- |
 | `npm run lint` | Passed. Expo ESLint rules on application and test source. |
 | `npm run typecheck` | Passed. TypeScript, including pure domain tests. Deno Edge Function source is excluded from the app TypeScript project. |
-| `npm test` | 29 passing tests, including thirteen nested database scenarios and chat reconnect pagination cases. |
-| `npm run test:backend` | Twelve passing checks against hosted Supabase: anonymous profile/chat/pet reads denied, anonymous pairing/chat/pet/date RPCs denied, calling endpoint returns 401 without user authentication. |
+| `npm test` | 36 passing tests, including fifteen nested database scenarios, mood streak/date boundaries, recent-photo filtering, prompt compatibility, and chat reconnect pagination. |
+| `npm run test:backend` | Fifteen passing checks against hosted Supabase, including anonymous mood history reads and mood RPCs denied. Calling endpoint returns 401 without user authentication. |
 | `npm run test:ui` | Passed sixteen browser scenarios in a fresh Playwright context, at desktop and 390/360px mobile widths; no runtime errors. |
-| `npm run test:client` | Eight browser regressions with mocked HTTP/Auth/media: session restoration, retry, account changes, chat gaps, cancelled calls, local sign-out, unpaired mode, and midnight. |
+| `npm run test:client` | Browser regressions with mocked HTTP/Auth/media: live mood saving, photo pagination, session restoration, retry, account changes, chat gaps, cancelled calls, local sign-out, unpaired mode, and midnight. |
+| `npm run test:dashboard` | Six browser scenarios: empty state, daily moods/edits/reload, shared answers, recent photos/viewer/scroll, responsive layout, and shared midnight. |
 | `npm run test:layout` | All sixteen routes pass the 360px layout scan with maximum-length names. |
-| `npm run test:config` | Expo introspection confirms Android camera/microphone permissions and iOS usage descriptions. |
-| `tests/hosted-features.sql` | Passed pairing, chat retry, care from both partners, date reconfirmation, and outsider isolation against the live schema. All temporary test identities/content rolled back. |
+| `npm run test:config` | Passed 3 November: Expo introspection confirms Android camera/microphone permissions and iOS usage descriptions. No native configuration changes in this dashboard update. |
+| `tests/hosted-features.sql` | Passed pairing, daily mood upserts/streaks, chat retry, care from both partners, date reconfirmation, and outsider isolation against the live schema. All temporary test identities/content rolled back. |
 | Expo export | Passed for web, Android, and iOS, including Android/iOS Hermes bytecode. Native build/signing is still pending. |
 
 The domain tests cover legal moves, vertical/horizontal/diagonal wins, a draw, wrong turns, full columns, quiz validation, date handling across time zones, text limits, and hidden answers. Two URL decoder tests cover valid Unicode and large malformed percent-encoded input.
 
-The PGlite suite applies all four real migration files to minimal Supabase-compatible scaffolding, then exercises the `anon` and `authenticated` roles with three separate identities. It checks pair size, one-use codes, outsider isolation, author ownership, hidden answers, quiz validation, drawing ownership, legal server-side turns and immutable results, partner-only calls, SDP removal on hangup, private storage policies, and invitation attempt limits. The new cases check chat idempotency and send limits, pet adoption/duplicate rewards/next-day care, and date editing/version checks/partner confirmation. This does not emulate Supabase Auth email delivery, Storage HTTP, Realtime transport, concurrent network clients, or WebRTC media.
+The PGlite suite applies all five real migration files to minimal Supabase-compatible scaffolding, then exercises the `anon` and `authenticated` roles with three separate identities. It checks pair size, one-use codes, outsider isolation, author ownership, hidden answers, quiz validation, drawing ownership, legal server-side turns and immutable results, partner-only calls, SDP removal on hangup, private storage policies, and invitation attempt limits. Shared-feature cases cover chat retries/limits, pet care, date reconfirmation, server-owned mood days, same-day mood updates, 45-day streaks, missed days, and excluding future entries. This does not emulate Supabase Auth email delivery, Storage HTTP, Realtime transport, concurrent network clients, or WebRTC media.
 
 The browser suite covers onboarding, mood-dependent partner home, note persistence, image selection/compression, drawing and ownership-aware undo, saving artwork, a complete game and persisted winner, both quiz answers and calculated percentage, plans, truthful demo call messaging, changing distance mode, narrow-screen overflow, and browser runtime errors. New scenarios send chat messages from both partners, adopt and rename a teddy, earn a level through both partners' care, and propose/confirm/edit a date with time and place. It uses demo accounts, not hosted signup. Screenshots and a result JSON are generated in `artifacts/`.
 
 ## Hosted database privacy update
 
 The user-approved third migration moved invitation records and internal functions into `private`, retained public invoker RPC wrappers, and added eleven foreign-key indexes. The hosted security advisor reported no warning or error findings after application. Its two informational findings are RLS-enabled private tables with no direct-access policy: `private.pair_invites` and `private.pair_attempts`. Direct access is intentionally denied; restricted definer functions perform the validated operations. Do not add permissive table policies to silence these findings. See [Supabase's RLS-without-policy advisor](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
+
+The fifth migration adds daily mood history and a recent-photo index. After application, security/performance advisors still reported no warnings or errors: the two intentional private-table notices above and nineteen [unused-index informational notices](https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index) remain. Index usage should be assessed with real traffic.
 
 ## Dependency and build limits
 

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
-import { createDemo, questionFor } from '../src/domain.ts';
+import { createDemo, questionFor, sharedDay } from '../src/domain.ts';
 
 const env = await readFile('.env', 'utf8');
 const projectUrl = env.match(/^EXPO_PUBLIC_SUPABASE_URL=(.+)$/m)?.[1].trim().replace(/^['"]|['"]$/g, '');
@@ -34,12 +34,17 @@ let holdSend = null; let holdBob = null; let holdAnswer = null;
 let sendStarted = false; let bobReadStarted = false; let answerStarted = false;
 let dropNextSend = false; let logoutScope; let incoming = null;
 const sentIds = []; const sentRows = new Map(); const historyReads = [];
+let loggedMood = null; const memoryReads = [];
+const photoFixture = await readFile('assets/icon.png');
+const photoRows = Array.from({ length: 42 }, (_, index) => ({ id: `eeeeeeee-1111-4111-8111-${String(42 - index).padStart(12, '0')}`, couple_id: coupleA, author_id: alice, kind: 'photo', body: `Live memory ${index + 1}`, photo_path: `${coupleA}/${alice}/${index}.jpg`, created_at: new Date(Date.now() - index * 1000).toISOString() }));
 const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
 await context.routeWebSocket(`wss://${host}/**`, ws => ws.close());
 await context.route(`https://${host}/**`, async route => {
   const request = route.request(); const url = new URL(request.url());
   const respond = value => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(value) });
   if (request.method() === 'OPTIONS') return route.fulfill({ status: 204 });
+  if (url.pathname === '/storage/v1/object/sign/couple-photos') return respond(request.postDataJSON().paths.map(path => ({ path, signedURL: `/object/sign/couple-photos/${path}?token=fixture` })));
+  if (url.pathname.startsWith('/storage/v1/object/sign/couple-photos/')) return route.fulfill({ status: 200, contentType: 'image/png', body: photoFixture });
   let id = alice;
   try { id = JSON.parse(Buffer.from((request.headers().authorization ?? '').split('.')[1], 'base64url').toString()).sub; } catch { /* Auth routes can be anonymous. */ }
   if (url.pathname === '/auth/v1/user') return respond(token(id).user);
@@ -55,6 +60,15 @@ await context.route(`https://${host}/**`, async route => {
   if (table === 'create_invite') { invitationMode = request.postDataJSON().relationship_mode; return respond({ code: '0123456789', expires_at: new Date(Date.now() + 600000).toISOString() }); }
   if (table === 'couples') return respond({ id: cid, mode: 'distance', time_zone: 'UTC', started_on: '2025-01-01' });
   if (table === 'pets') return respond(null);
+  if (table === 'get_mood_history') return respond(loggedMood && id === alice ? { entries: [loggedMood], streaks: [{ authorId: alice, days: 1, lastDay: loggedMood.day }] } : { entries: [], streaks: [] });
+  if (table === 'log_mood') { const body = request.postDataJSON(); assert.deepEqual(Object.keys(body).sort(), ['feeling', 'note', 'support']); loggedMood = { authorId: id, day: sharedDay('UTC'), mood: body.feeling, updatedAt: new Date().toISOString() }; return respond(null); }
+  if (table === 'moments' && url.searchParams.get('kind') === 'eq.photo') {
+    assert.ok(url.searchParams.getAll('created_at').some(value => value.startsWith('gte.')));
+    assert.ok(url.searchParams.getAll('created_at').some(value => value.startsWith('lte.')));
+    const before = url.searchParams.get('or')?.match(/created_at\.lt\.([^,)]+)/)?.[1];
+    memoryReads.push(before);
+    return respond(id === alice ? photoRows.filter(row => !before || row.created_at < before).slice(0, Number(url.searchParams.get('limit'))) : []);
+  }
   if (table === 'calls') return respond(incoming);
   if (table === 'answer_call') { answerStarted = true; incoming = { ...incoming, state: 'accepted' }; await holdAnswer?.promise; return respond(null); }
   if (table === 'end_call') { incoming = incoming && { ...incoming, state: 'ended', offer: null, answer: null }; return respond(null); }
@@ -98,6 +112,18 @@ try {
   await page.goto(`${base}/chat`);
   await page.getByText('Only Alice’s private history', { exact: true }).waitFor();
   check('valid live account restores even with corrupt demo storage');
+  if (await page.getByRole('button', { name: 'Dismiss error' }).isVisible()) await page.getByRole('button', { name: 'Dismiss error' }).click();
+  await page.goto(base); await page.getByRole('button', { name: 'Check in', exact: true }).click();
+  await page.getByRole('radio', { name: 'Low', exact: true }).click();
+  await page.getByRole('button', { name: 'Share how I’m feeling' }).click();
+  await page.getByTestId('mood-streak').getByText('1 day in a row', { exact: true }).waitFor();
+  assert.equal(loggedMood.mood, 'low'); assert.equal(loggedMood.authorId, alice);
+  check('live mood form calls the server-owned daily log and refreshes its streak');
+  await page.getByRole('button', { name: 'More memories', exact: true }).click();
+  await page.getByRole('button', { name: /Open photo: Live memory 42,/ }).waitFor();
+  assert.ok(memoryReads.includes(photoRows[39].created_at));
+  check('Memory Lane queries photos independently and loads the next page with its photo cursor');
+  await page.goto(`${base}/chat`); await page.getByText('Only Alice’s private history', { exact: true }).waitFor();
   if (await page.getByRole('button', { name: 'Dismiss error' }).isVisible()) await page.getByRole('button', { name: 'Dismiss error' }).click();
   dropNextSend = true;
   await page.getByRole('textbox', { name: 'Message your partner' }).fill('Retry this once');
@@ -187,7 +213,12 @@ try {
   await daily.clock.install({ time: new Date('2030-11-03T23:59:50Z') });
   await daily.goto(`${base}/question`); await daily.getByText(questionFor('2030-11-03'), { exact: true }).waitFor();
   await daily.getByRole('textbox', { name: 'Your answer', exact: true }).fill('A draft for yesterday’s question');
-  await daily.clock.fastForward(40000);
+  await daily.clock.setFixedTime(new Date('2030-11-04T00:00:01Z'));
+  await daily.getByRole('button', { name: 'Share my answer', exact: true }).click();
+  await daily.getByText('A new day has started. Open today’s question and try again.', { exact: true }).waitFor();
+  assert.equal(await daily.evaluate(() => JSON.parse(localStorage.getItem('closer.demo.v2')).space.answers.some(answer => answer.day === '2030-11-04')), false);
+  check('a draft submitted just after midnight cannot be saved under a different question');
+  await daily.clock.runFor(40000);
   await daily.getByText(questionFor('2030-11-04'), { exact: true }).waitFor();
   assert.equal(await daily.getByRole('textbox', { name: 'Your answer', exact: true }).inputValue(), '');
   check('open daily question changes at shared midnight and clears the old draft');
@@ -198,6 +229,6 @@ try {
 } catch (error) {
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/client-sync-failure.png', fullPage: true });
-  await writeFile('artifacts/client-sync-failure.txt', `${error.stack}\n${await page.locator('body').innerText()}\n${JSON.stringify({ passed, errors, historyReads })}`);
+  await writeFile('artifacts/client-sync-failure.txt', `${error.stack}\n${await page.locator('body').innerText()}\n${JSON.stringify({ passed, errors, historyReads, memoryReads })}`);
   throw error;
 } finally { holdSend?.resolve(); holdBob?.resolve(); holdAnswer?.resolve(); await browser.close(); }
