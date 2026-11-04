@@ -140,6 +140,16 @@ test('database migrations and access boundaries', async t => {
     await as(outsider); assert.equal((await db.query('select * from public.plans')).rows.length,0);
     await assert.rejects(db.query('select public.save_plan($1,$2,2)',[plan.id,draft]),/Connect/);
   });
+  await t.test('daily mood logs are server-owned, partner-only, and upsert one shared day',async () => {
+    await as(null,'anon'); await assert.rejects(db.query('select public.get_mood_history()'),/permission denied/);
+    await as(a); await db.query("select public.log_mood('low','A quieter day','Just listen')"); await db.query("select public.log_mood('calm')");
+    let history = await scalar('select public.get_mood_history()');
+    assert.equal(history.entries.length,1); assert.equal(history.entries[0].authorId,a); assert.equal(history.entries[0].mood,'calm'); assert.equal(history.streaks[0].days,1);
+    assert.equal(history.entries[0].day,await scalar('select private.couple_today()::text'));
+    await assert.rejects(db.query("update public.mood_entries set author_id=$1",[b]),/permission denied/);
+    await as(b); assert.equal((await scalar('select public.get_mood_history()')).entries.length,1);
+    await as(outsider); history=await scalar('select public.get_mood_history()'); assert.deepEqual(history,{entries:[],streaks:[]});
+  });
   await t.test('invalid invitation attempts are rate limited without rolling back the count',async () => {
     await as(outsider); let result;
     for(let i=0;i<11;i++) result=await scalar("select public.join_couple('0000000000')");

@@ -10,7 +10,7 @@ import { Avatar, Button, C, Card, F, IconButton, S, SectionTitle, T } from './ui
 
 export function MemoryLane() {
   const { space, userId, run, heart, busy } = useSpace();
-  const now = useNow();
+  const now = useNow(space);
   const photos = recentPhotoMoments(space.moments, now, 30);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const activePhoto: Moment | undefined = photos.find(p => p.id === selectedId);
@@ -63,6 +63,8 @@ export function MemoryLane() {
             return (
               <Pressable
                 key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Open shared photo: ${item.text || 'A little moment'}`}
                 onPress={() => setSelectedId(item.id)}
                 style={({ pressed }) => ({
                   width: 205,

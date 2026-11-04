@@ -205,7 +205,7 @@ export function PartnerNotificationCenterCard({
       </View>
 
       <T kind="small">
-        Get alerted immediately when {partnerName} posts a new Shared Journal entry, shares an Instant Pic, or leaves a Quick Note on your dashboard.
+        See partner activity received while Closer is open. Journals and sticky notes currently stay on this device.
       </T>
 
       {notificationPermission !== 'granted' && (
@@ -220,12 +220,12 @@ export function PartnerNotificationCenterCard({
           }}
         >
           <T kind="small" style={{ color: '#6E4E3A', fontFamily: F.medium }}>
-            Enable Expo Push & Local Notifications so {partnerName}’s notes and photos chime right away.
+            Enable notifications on this device for partner activity received while Closer is open.
           </T>
           <View style={[S.row, { flexWrap: 'wrap', gap: 10 }]}>
             <Button
               compact
-              title="Enable Expo Notifications"
+              title="Enable device notifications"
               icon={Bell}
               onPress={() => {
                 void enableNotifications();

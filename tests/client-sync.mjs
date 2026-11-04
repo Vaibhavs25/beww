@@ -1,6 +1,7 @@
 // Client integration tests: real exported app, controlled HTTP/Auth and media doubles.
 // These deliberately do not create hosted users or claim to test real WebRTC transport.
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { createDemo, questionFor } from '../src/domain.ts';
@@ -53,6 +54,7 @@ await context.route(`https://${host}/**`, async route => {
   if (table === 'couple_members') return respond({ couple_id: cid });
   if (table === 'couples') return respond({ id: cid, mode: 'distance', time_zone: 'UTC', started_on: '2025-01-01' });
   if (table === 'pets') return respond(null);
+  if (table === 'get_mood_history') return respond({ entries: [], streaks: [] });
   if (table === 'calls') return respond(incoming);
   if (table === 'answer_call') { answerStarted = true; incoming = { ...incoming, state: 'accepted' }; await holdAnswer?.promise; return respond(null); }
   if (table === 'end_call') { incoming = incoming && { ...incoming, state: 'ended', offer: null, answer: null }; return respond(null); }
@@ -78,6 +80,11 @@ await context.addInitScript(({ key, session }) => {
   localStorage.setItem(key, JSON.stringify(session));
   // A corrupt demo save must not stop restoration of a valid live account.
   localStorage.setItem('closer.demo.v2', '{broken');
+  localStorage.setItem('closer.onboardedSpace.v1', '{broken');
+  const alert = (title, owner) => ({ id: owner, sourceId: owner, kind: 'quick-note', title, body: 'Private notification fixture', authorId: 'partner-fixture', authorName: 'Partner', targetRoute: '/', createdAt: new Date().toISOString(), read: false });
+  localStorage.setItem('closer.notifications.v1', JSON.stringify([alert('Legacy private alert', 'legacy')]));
+  localStorage.setItem('closer.notifications.v1.11111111-1111-4111-8111-111111111111', JSON.stringify([alert('Alice private alert', 'alice')]));
+  localStorage.setItem('closer.notifications.v1.22222222-2222-4222-8222-222222222222', JSON.stringify([alert('Bob private alert', 'bob')]));
   class Peer extends EventTarget {
     iceGatheringState = 'complete'; connectionState = 'new'; localDescription = null; remoteDescription = null;
     addTrack() {} async createOffer() { return { type: 'offer', sdp: 'mock offer description' }; }
@@ -97,6 +104,10 @@ try {
   await page.getByText('Only Alice’s private history', { exact: true }).waitFor();
   check('valid live account restores even with corrupt demo storage');
   if (await page.getByRole('button', { name: 'Dismiss error' }).isVisible()) await page.getByRole('button', { name: 'Dismiss error' }).click();
+  await page.getByRole('tab', { name: 'Us', exact: true }).click();
+  await page.getByText('Alice private alert', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Legacy private alert', { exact: true }).count(), 0);
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
   dropNextSend = true;
   await page.getByRole('textbox', { name: 'Message your partner' }).fill('Retry this once');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -125,6 +136,12 @@ try {
   await page.getByText('History message 150', { exact: true }).waitFor();
   assert.equal(await page.getByText('Late reply from Alice', { exact: true }).count(), 0);
   check('account switch clears private drafts and rejects the prior account’s late write response');
+  await page.getByRole('tab', { name: 'Us', exact: true }).click();
+  await page.getByText('Bob private alert', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Alice private alert', { exact: true }).count(), 0);
+  assert.equal(await page.getByText('Legacy private alert', { exact: true }).count(), 0);
+  await page.getByRole('tab', { name: 'Chat', exact: true }).click();
+  check('notification history restores only for its signed-in owner');
 
   const earlier = () => page.getByRole('button', { name: 'Earlier messages', exact: true });
   await earlier().click();
@@ -161,7 +178,9 @@ try {
   await page.getByRole('button', { name: 'Back to together' }).click();
   await page.getByRole('tab', { name: 'Us', exact: true }).click();
   await page.getByRole('button', { name: 'Sign out on this device' }).click();
-  await page.getByRole('button', { name: 'Switch demo partner' }).waitFor();
+  await page.getByText('Only Alice’s private history', { exact: true }).waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: 'Sign out on this device' }).waitFor({ state: 'hidden' });
+  assert.equal(await page.evaluate(key => localStorage.getItem(key), storageKey), null);
   assert.equal(logoutScope, 'local');
   check('device sign-out requests local scope and removes live state');
 
@@ -169,13 +188,16 @@ try {
   await midnight.routeWebSocket(`wss://${host}/**`, ws => ws.close());
   await midnight.route(`https://${host}/**`, route => route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }));
   const demo = createDemo(); demo.timeZone = 'UTC';
-  await midnight.addInitScript(space => localStorage.setItem('closer.demo.v2', JSON.stringify({ space, userId: 'alex', onboarded: true })), demo);
+  await midnight.addInitScript(space => localStorage.setItem('closer.onboardedSpace.v1', JSON.stringify({ space, onboarded: true })), demo);
   const daily = await midnight.newPage(); daily.on('pageerror', e => errors.push(e.message));
   await daily.clock.install({ time: new Date('2030-11-03T23:59:50Z') });
-  await daily.goto(`${base}/question`); await daily.getByText(questionFor('2030-11-03'), { exact: true }).waitFor();
+  await daily.goto(`${base}/question`); await daily.getByText(`“${questionFor('2030-11-03')}”`, { exact: true }).waitFor();
   await daily.getByRole('textbox', { name: 'Your answer', exact: true }).fill('A draft for yesterday’s question');
-  await daily.clock.fastForward(40000);
-  await daily.getByText(questionFor('2030-11-04'), { exact: true }).waitFor();
+  await daily.clock.setFixedTime(new Date('2030-11-04T00:00:01Z'));
+  await daily.getByRole('button', { name: 'Share my answer', exact: true }).click();
+  await daily.getByText('A new day has started. Open today’s question and try again.', { exact: true }).waitFor();
+  await daily.clock.runFor(40000);
+  await daily.getByText(`“${questionFor('2030-11-04')}”`, { exact: true }).waitFor();
   assert.equal(await daily.getByRole('textbox', { name: 'Your answer', exact: true }).inputValue(), '');
   check('open daily question changes at shared midnight and clears the old draft');
   await midnight.close();

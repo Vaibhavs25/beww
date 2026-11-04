@@ -26,7 +26,7 @@ async function completeDescription(pc: RTCPeerConnection) {
 }
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
-  const { space, userId, demo, notify } = useSpace(); const { partner } = usePeople();
+  const { space, userId, demo, session, notify } = useSpace(); const { partner } = usePeople();
   const [phase, setPhase] = useState<Phase>('idle'); const [message, setMessage] = useState(''); const [call, setCall] = useState<Call | null>(null);
   const [local, setLocal] = useState<MediaStream | null>(null); const [remote, setRemote] = useState<MediaStream | null>(null); const [muted, setMuted] = useState(false); const [cameraOff, setCameraOff] = useState(false); const [seconds, setSeconds] = useState(0);
   const peer = useRef<RTCPeerConnection | null>(null); const stream = useRef<MediaStream | null>(null); const current = useRef<Call | null>(null); const preparing = useRef(false); const generation = useRef(0); const applyingAnswer = useRef(false); const connectedAt = useRef(0);
@@ -68,7 +68,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   }, [cleanup, userId]);
   const partnerId = partner?.id;
   useEffect(() => {
-    if (demo || !space.id || !partnerId || !supabase) return;
+    if (demo || !session || !space.id || !partnerId || !supabase) return;
     let active = true; let refreshing = false;
     const refresh = async () => {
       if (refreshing) return; refreshing = true;
@@ -79,7 +79,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     const channel = supabase.channel(`calls-${space.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'calls', filter: `couple_id=eq.${space.id}` }, () => { void refresh(); }).subscribe(status => { if (status === 'SUBSCRIBED') void refresh(); });
     void refresh(); const timer = setInterval(() => { void refresh(); }, 5000);
     return () => { active = false; clearInterval(timer); void supabase!.removeChannel(channel); };
-  }, [demo, space.id, partnerId, receive, notify]);
+  }, [demo, session, space.id, partnerId, receive, notify]);
   useEffect(() => () => { cleanup(); current.current = null; setCall(null); setPhase('idle'); }, [cleanup, userId, space.id]);
   useEffect(() => {
     if (!activePhases.includes(phase)) return;
@@ -114,7 +114,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     return pc;
   };
   const start = async (video: boolean) => {
-    if (demo || !partner || !space.id) throw new Error('Connect both accounts before calling your partner.');
+    if (demo || !session || !partner || !space.id) throw new Error('Connect both accounts before calling your partner.');
     if (preparing.current || peer.current || current.current) return;
     const version = generation.current;
     preparing.current = true; setPhase('preparing'); setMessage(''); setSeconds(0);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-export function useNow() {
+export function useNow(refreshKey?: unknown) {
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(timer); }, []);
+  useEffect(() => { const tick = () => setNow(Date.now()); const immediate = setTimeout(tick, 0); const timer = setInterval(tick, 30000); return () => { clearTimeout(immediate); clearInterval(timer); }; }, [refreshKey]);
   return now;
 }

@@ -165,7 +165,7 @@ export function SharedJournal({
 
       {/* Chronological & Author Filter Bar */}
       <View style={[S.between, { flexWrap: 'wrap', gap: 8 }]}>
-        <View style={[S.wrap, { gap: 6 }]}>
+        <View style={[S.wrap, { gap: 6, flexShrink: 1, maxWidth: '100%' }]}>
           {[
             { id: 'all', label: `All (${(space.journal ?? []).length})` },
             ...space.profiles.map(p => ({ id: p.id, label: p.name })),
@@ -184,9 +184,12 @@ export function SharedJournal({
                   backgroundColor: active ? C.ink : C.bg,
                   borderWidth: 1,
                   borderColor: active ? C.ink : C.line,
+                  maxWidth: 150,
+                  flexShrink: 1,
                 }}
               >
                 <T
+                  numberOfLines={1}
                   style={{
                     fontSize: 12,
                     fontFamily: active ? F.bold : F.medium,

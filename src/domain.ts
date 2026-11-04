@@ -78,7 +78,7 @@ export type PartnerNotificationItem = {
   createdAt: string;
   read: boolean;
 };
-export type Space = { id: string; startedOn: string; originStory?: CoupleOriginStory; mode: 'nearby' | 'distance'; timeZone: string; profiles: Profile[]; moodLogs?: MoodLog[]; adventures?: AdventureGoal[]; journal?: JournalEntry[]; trivia?: TriviaQuestion[]; quickNotes?: QuickNote[]; errands?: ErrandItem[]; moments: Moment[]; plans: Plan[]; answers: Answer[]; canvas: Stroke[]; games: Game[]; quizzes: QuizAnswer[]; messages: ChatMessage[]; hasOlderMessages: boolean; pet: Pet | null; petCare: PetCare[]; featuresReady: boolean };
+export type Space = { id: string; startedOn: string; originStory?: CoupleOriginStory; mode: 'nearby' | 'distance'; timeZone: string; profiles: Profile[]; moodLogs?: MoodLog[]; moodStreaks?: { authorId: string; days: number; lastDay: string }[]; adventures?: AdventureGoal[]; journal?: JournalEntry[]; trivia?: TriviaQuestion[]; quickNotes?: QuickNote[]; errands?: ErrandItem[]; moments: Moment[]; plans: Plan[]; answers: Answer[]; canvas: Stroke[]; games: Game[]; quizzes: QuizAnswer[]; messages: ChatMessage[]; hasOlderMessages: boolean; pet: Pet | null; petCare: PetCare[]; featuresReady: boolean };
 
 export const QUICK_NOTE_COLORS: { id: QuickNoteColor; label: string; bg: string; border: string; tape: string; ink: string; muted: string }[] = [
   { id: 'butter', label: 'Butter', bg: '#FDF3C7', border: '#E6D284', tape: '#DFC364', ink: '#463514', muted: '#7A6230' },
@@ -965,7 +965,7 @@ export function recentDays(today: string, count = 7) {
 
 export function upsertMoodLog(logs: MoodLog[], entry: MoodLog): MoodLog[] {
   const filtered = logs.filter(item => !(item.authorId === entry.authorId && item.day === entry.day));
-  return [...filtered, entry].sort((a, b) => a.day.localeCompare(b.day) || a.createdAt.localeCompare(b.createdAt)).slice(-120);
+  return [...filtered, entry].sort((a, b) => a.day.localeCompare(b.day) || a.createdAt.localeCompare(b.createdAt));
 }
 
 export function moodStreak(logs: MoodLog[], authorId: string, today: string) {
@@ -979,25 +979,12 @@ export function moodStreak(logs: MoodLog[], authorId: string, today: string) {
   return count;
 }
 
-export function coupleMoodTimeline(logs: MoodLog[] | undefined, profiles: Profile[], timeZone: string, today: string, userId: string) {
-  let merged = [...(logs ?? [])];
-  for (const profile of profiles) {
-    if (!profile.moodAt) continue;
-    const loggedDay = sharedDay(timeZone, new Date(profile.moodAt));
-    if (!merged.some(item => item.authorId === profile.id && item.day === loggedDay)) {
-      merged = upsertMoodLog(merged, {
-        authorId: profile.id,
-        day: loggedDay,
-        mood: profile.mood,
-        note: profile.moodNote,
-        need: profile.need,
-        createdAt: profile.moodAt,
-      });
-    }
-  }
+export function coupleMoodTimeline(logs: MoodLog[] | undefined, profiles: Profile[], timeZone: string, today: string, userId: string, streaks?: Space['moodStreaks']) {
+  const merged = logs ?? [];
   const partnerId = profiles.find(p => p.id !== userId)?.id;
-  const myStreak = moodStreak(merged, userId, today);
-  const partnerStreak = partnerId ? moodStreak(merged, partnerId, today) : 0;
+  const runFor = (id: string) => streaks ? (streaks.find(run => run.authorId === id && run.lastDay >= shiftDay(today, -1) && run.lastDay <= today)?.days ?? 0) : moodStreak(merged, id, today);
+  const myStreak = runFor(userId);
+  const partnerStreak = partnerId ? runFor(partnerId) : 0;
   const activeDays = new Set(merged.map(item => item.day));
   let cursor = activeDays.has(today) ? today : shiftDay(today, -1);
   let combinedStreak = 0;
@@ -1024,7 +1011,7 @@ export function coupleMoodTimeline(logs: MoodLog[] | undefined, profiles: Profil
 export function recentPhotoMoments(moments: Moment[], nowMs = Date.now(), days = 30): Moment[] {
   const cutoff = nowMs - days * 86400000;
   return moments
-    .filter(m => m.kind === 'photo' && Boolean(m.image) && Date.parse(m.createdAt) >= cutoff)
+    .filter(m => m.kind === 'photo' && Boolean(m.image) && Date.parse(m.createdAt) >= cutoff && Date.parse(m.createdAt) <= nowMs)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

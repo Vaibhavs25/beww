@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { ArrowLeftRight, Heart, Check, Sparkles } from 'lucide-react-native';
+import { ArrowLeftRight, Heart, Check } from 'lucide-react-native';
 import { BackLink, Button, C, Card, F, Page, S, T } from '../components/ui';
 import { RelationshipQuiz } from '../components/relationship-quiz';
 import { quizFor, quizMatch, sharedDay } from '../domain';
@@ -17,8 +17,7 @@ function DailyQuiz({ day }: { day: string }) {
   const { space, userId, run, busy, submitQuiz, demo, switchPartner } = useSpace();
   const { me, partner } = usePeople();
   const [choices, setChoices] = useState<number[]>(Array(5).fill(-1));
-  const [packOffset, setPackOffset] = useState(0);
-  const pack = quizFor(day, packOffset);
+  const pack = quizFor(day);
   const mine = space.quizzes.find(q => q.authorId === userId && q.day === day);
   const theirs = space.quizzes.find(q => q.authorId !== userId && q.day === day);
   const match = mine && theirs ? quizMatch(mine.choices, theirs.choices) : null;
@@ -33,7 +32,6 @@ function DailyQuiz({ day }: { day: string }) {
               <T kind="label" style={{ color: C.green }}>TODAY’S THEME</T>
               <T kind="serif" style={{ fontSize: 20 }}>{pack.title}</T>
             </View>
-            <Button compact secondary title="Next pack" icon={Sparkles} onPress={() => setPackOffset(n => n + 1)} />
           </View>
         </Card>
         {mine && (
@@ -109,7 +107,7 @@ function DailyQuiz({ day }: { day: string }) {
             disabled={choices.some(x => x < 0)}
             loading={busy}
             onPress={() => {
-              void run(() => submitQuiz(choices));
+                void run(() => submitQuiz(choices, day));
             }}
           />
         )}

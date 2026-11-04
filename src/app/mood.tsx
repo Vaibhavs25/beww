@@ -14,7 +14,7 @@ export default function MoodScreen() {
   const [note, setNote] = useState(me.moodNote);
   const [need, setNeed] = useState(me.need);
   const todayKey = sharedDay(space.timeZone, new Date(useNow()));
-  const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId);
+  const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId, space.moodStreaks);
   const recentNotes = [...timeline.logs]
     .filter(item => item.note)
     .reverse()

@@ -17,7 +17,7 @@ function UsDetails() {
   const { space, demo, busy, run, notify, updateProfile, setMode, switchPartner, resetDemo, signOut, session } = useSpace(); const { me, partner } = usePeople();
   const [name, setName] = useState(me.name); const [start, setStart] = useState(space.startedOn); const [confirm, setConfirm] = useState(false); const { width } = useWindowDimensions();
   const partnerDisplay = partner?.nickname || space.originStory?.partnerNickname || partner?.name || 'your person';
-  const isLinked = Boolean(space.originStory?.isLinked || space.originStory?.joinedCode);
+  const isLinked = Boolean(session && space.profiles.length === 2 && space.profiles.every(profile => profile.id !== 'partner'));
 
   const exportKeepsake = () => {
     const payload = {

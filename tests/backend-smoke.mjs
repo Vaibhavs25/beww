@@ -10,7 +10,7 @@ const invites=await db.rpc('create_invite',{relationship_mode:'nearby',shared_ti
 assert.ok(invites.error); assert.match(invites.error.message,/permission denied/); console.log('PASS hosted pairing cannot be called anonymously');
 const call=await fetch(`${env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/call-ice`,{method:'POST',headers:{apikey:env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:'{}'});
 assert.equal(call.status,401); console.log('PASS calling endpoint verifies authentication itself');
-for (const table of ['chat_messages','pets','pet_care']) {
+for (const table of ['chat_messages','pets','pet_care','mood_entries']) {
   const result=await db.from(table).select('*').limit(1);
   assert.equal(result.error?.code,'42501'); console.log(`PASS hosted ${table} rejects anonymous reads`);
 }
@@ -19,6 +19,10 @@ for (const [rpc,args] of [
   ['adopt_pet',{pet_name:'Mochi',pet_kind:'bear'}],
   ['care_for_pet',{care_action:'feed'}],
   ['rename_pet',{pet_name:'Another name'}],
+  ['log_mood',{feeling:'happy',note:'',support:''}],
+  ['get_mood_history',{}],
+  ['generate_invitation_code',{relationship_mode:'nearby',shared_time_zone:'UTC'}],
+  ['verify_and_link_space',{invite_code:'123456'}],
   ['save_plan',{plan_id:null,draft:{},expected_revision:null}],
   ['respond_to_plan',{plan_id:'aaaaaaaa-1111-4111-8111-111111111111',going:true,expected_revision:1}],
 ]) {

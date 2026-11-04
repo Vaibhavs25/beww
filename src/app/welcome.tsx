@@ -59,7 +59,7 @@ export default function Welcome() {
   const { width } = useWindowDimensions();
   const wide = width > 900;
   const compactPhone = width < 440;
-  const { space, onboarded, completeOnboarding, generateConnectionCode, notify, run, busy } = useSpace();
+  const { space, session, onboarded, completeOnboarding, generateConnectionCode, notify, run, busy } = useSpace();
   const existing = space.originStory;
 
   const initialDraft = useMemo(
@@ -222,6 +222,7 @@ export default function Welcome() {
   };
 
   const copyInviteCode = async () => {
+    if (!session) { notify('Sign in from Connect our phones to generate a live invitation.'); return; }
     try {
       if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(inviteCode);
@@ -233,6 +234,7 @@ export default function Welcome() {
   };
 
   const shareInviteCode = async () => {
+    if (!session) { notify('Sign in from Connect our phones to generate a live invitation.'); return; }
     try {
       await Share.share({
         message: `Hey ${displayNickname}! I set up our private space on Closer. Join me with our unique 6-digit couple code: ${inviteCode}`,
@@ -1263,9 +1265,9 @@ export default function Welcome() {
             {step === 6 && (
               <View style={{ gap: 18 }}>
                 <View style={{ gap: 4 }}>
-                  <T kind="serif">Share your code with {displayNickname}</T>
+                  <T kind="serif">Connect with {displayNickname}</T>
                   <T kind="small">
-                    Send this unique one-time 6-digit connection code to {displayNickname} so {partnerPronounSubj} can join your shared space, or redeem {partnerPronounObj} code below.
+                    This setup code is a preview. After setup, sign in from Connect our phones to create or verify a live invitation for {displayNickname}.
                   </T>
                 </View>
 
@@ -1412,8 +1414,8 @@ export default function Welcome() {
                       onPress={() => {
                         const normalized = normalizeConnectionCode(joinCode);
                         setJoinCode(normalized);
-                        setJoinedSuccess(true);
-                        notify(`Partner code ${normalized} verified! Review Terms & Privacy next ♡`);
+                        setJoinedSuccess(false);
+                        notify('Code saved for later. Sign in from Connect our phones to verify it.');
                         setStep(7);
                       }}
                     />

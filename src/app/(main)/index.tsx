@@ -24,13 +24,13 @@ export default function Today() {
   const { me, partner } = usePeople();
   const { width } = useWindowDimensions();
   const wide = width > 1120;
-  const now = useNow();
+  const now = useNow(space);
   const todayKey = sharedDay(space.timeZone, new Date(now));
-  const recentMood = partner && now - Date.parse(partner.moodAt) < 86400000;
+  const recentMood = partner && now >= Date.parse(partner.moodAt) && now - Date.parse(partner.moodAt) < 86400000;
   const mood = moodFor(recentMood ? partner.mood : 'calm');
   const quiet = recentMood && (partner?.need === 'Quiet time' || partner?.mood === 'space');
   const todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId);
+  const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId, space.moodStreaks);
   const partnerDisplay = partner?.nickname || space.originStory?.partnerNickname || partner?.name || '?';
 
   return (
@@ -40,6 +40,7 @@ export default function Today() {
       eyebrow={todayLabel.toUpperCase()}
       action={width > 700 ? <CoupleAvatars names={[me.name, partnerDisplay]} avatars={[me.avatar, partner?.avatar]} size={49} /> : undefined}
     >
+      <T kind="small">Journals, adventures, trivia, sticky notes, and errands are saved on this device.</T>
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24, alignItems: 'stretch' }}>
         <View style={{ flex: wide ? 1.65 : undefined, gap: 24 }}>
           <View
@@ -234,7 +235,7 @@ export default function Today() {
             )}
           </View>
 
-          <DailyQuestion day={todayKey} />
+          <DailyQuestion key={`${userId}:${todayKey}`} day={todayKey} />
 
           <SharedJournal maxItems={3} />
         </View>

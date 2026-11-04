@@ -4,7 +4,7 @@ A private shared space for two partners, nearby or far apart. Built with Expo SD
 
 ## Try it
 
-The local browser preview runs at **http://localhost:8082**. Choose your distance setting, then **Explore our little world**. The demo badge lets you switch between both partners. Demo changes persist on this device; they are separate from live accounts.
+The browser preview defaults to **http://localhost:3000**. The imported app uses a seven-step local setup. Sign in from **Connect our phones** to create or redeem a live partner invitation. The audit preview runs at **http://127.0.0.1:8084**.
 
 ```sh
 npm ci
@@ -12,7 +12,9 @@ npm run build:web
 npm run preview
 ```
 
-For development, run `npm start`. Use `npx expo install <package>` when adding dependencies so versions match SDK 57. The web preview is a convenient way to explore the app; it is not an installed Android or iPhone build.
+For Expo development, run `npm run dev:native`; `npm start` serves the exported web preview. Use `npx expo install <package>` when adding dependencies so versions match SDK 57. The web preview is not an installed Android or iPhone build.
+
+The [GitHub import audit](docs/GEMINI_IMPORT_AUDIT.md) records the tested Gemini changes and integration fixes. Journals, adventures, relationship trivia, sticky notes, and errands currently stay on one device. Live mood history and six-digit account linking are connected to Supabase. Remote push delivery and physical-phone testing remain unfinished.
 
 ## What is built
 
@@ -35,7 +37,7 @@ Photos, moods, drawing strokes, game turns, and other shared content have Supaba
 
 ## Backend
 
-The existing organization contains the `closer` project in Mumbai (`ap-south-1`), project ref `qsdjhpegxarubhmzvnoa`. Four migrations and the `call-ice` Edge Function have been applied. The local `.env` is configured and ignored by Git.
+The existing organization contains the `closer` project in Mumbai (`ap-south-1`), project ref `qsdjhpegxarubhmzvnoa`. Six migrations and the `call-ice` Edge Function have been applied. The local `.env` is configured and ignored by Git.
 
 For a separate checkout, copy `.env.example` to `.env` and supply the project's URL and **publishable** key. Only those public values belong in the app. Service-role keys, SMTP credentials, and TURN secrets must stay server-side. Expo inlines `EXPO_PUBLIC_*` values into the app bundle; see [Expo environment variables](https://docs.expo.dev/eas/environment-variables/).
 
@@ -45,6 +47,8 @@ Migration history:
 - `20261103095312_closer_access_games_calls.sql`: tighter access boundaries, validated game operations, and call signaling.
 - `20261103102801_private_operations_and_indexes.sql`: invitation records and internal operations moved to a private schema, with foreign-key indexes. Applied with the user's approval, preserving existing data.
 - `20261103134634_chat_pet_date_planning.sql`: private couple chat, shared pets and once-daily care, and date details/confirmations. Applied and verified against the hosted database; earlier data is preserved.
+- `20261104033303_daily_mood_history.sql`: daily mood history, server-owned shared days, and individual streak counts.
+- `20261104171203_six_digit_space_invitation.sql`: verified, rate-limited six-digit invitations and one-time account linking. Applied with the user's approval and tested with rolled-back identities.
 
 All exposed application tables use row-level security. Anonymous requests cannot read profiles or issue pairing RPCs. Public RPCs are invoker wrappers over restricted private operations. Photo links expire. This is access-controlled storage, **not end-to-end encryption**; project administrators retain backend access.
 

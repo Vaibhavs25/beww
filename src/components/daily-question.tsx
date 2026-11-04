@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeftRight, CheckCircle2, Lock, MessageCircle, PenLine, RefreshCw } from 'lucide-react-native';
+import { ArrowLeftRight, CheckCircle2, Lock, MessageCircle, PenLine } from 'lucide-react-native';
 import { dailyQuestionItemFor, sharedDay, visibleAnswers } from '../domain';
 import { usePeople, useSpace } from '../store';
 import { useNow } from '../use-now';
@@ -21,11 +21,10 @@ export function DailyQuestion({
   const now = useNow();
   const todayKey = day ?? sharedDay(space.timeZone, new Date(now));
 
-  const [offset, setOffset] = useState(0);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const item = dailyQuestionItemFor(todayKey, offset);
+  const item = dailyQuestionItemFor(todayKey);
   const myAnswer = space.answers.find(a => a.authorId === userId && a.day === todayKey);
   const partnerAnswer = space.answers.find(a => a.authorId !== userId && a.day === todayKey);
   const visible = visibleAnswers(space.answers, todayKey, userId);
@@ -33,7 +32,7 @@ export function DailyQuestion({
   const handleSubmit = () => {
     if (!draft.trim()) return;
     void run(async () => {
-      await answer(draft);
+      await answer(draft, todayKey);
       setDraft('');
       setComposerOpen(false);
     });
@@ -48,28 +47,6 @@ export function DailyQuestion({
             {item.tag} · {item.index + 1}/{item.total}
           </T>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Shuffle daily question prompt"
-          onPress={() => setOffset(prev => prev + 1)}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            paddingHorizontal: 11,
-            paddingVertical: 6,
-            borderRadius: 10,
-            backgroundColor: C.paper,
-            borderWidth: 1,
-            borderColor: C.line,
-            opacity: pressed ? 0.72 : 1,
-          })}
-        >
-          <RefreshCw size={13} color={C.ink} strokeWidth={1.6} />
-          <T style={{ fontSize: 12, fontFamily: F.medium, color: C.ink }}>
-            {offset === 0 ? 'Shuffle prompt' : 'Next prompt'}
-          </T>
-        </Pressable>
       </View>
 
       <View style={{ gap: 8 }}>

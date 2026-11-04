@@ -8,19 +8,22 @@ const context = await browser.newContext({ viewport: { width: 360, height: 800 }
 const space = createDemo();
 space.profiles[0].name = 'AlexandriaAlexandriaAlexandriaXX'.slice(0, 30);
 space.profiles[1].name = 'ChristopherChristopherChristop'.slice(0, 30);
-await context.addInitScript(value => localStorage.setItem('closer.demo.v2', JSON.stringify({ space: value, userId: 'alex', onboarded: true })), space);
+await context.addInitScript(value => localStorage.setItem('closer.onboardedSpace.v1', JSON.stringify({ space: value, onboarded: true })), space);
 const page = await context.newPage(); const results = []; const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const base = process.env.PREVIEW_URL || 'http://localhost:3000';
 await mkdir('artifacts', { recursive: true });
 try {
-  for (const route of ['/', '/chat', '/together', '/story', '/us', '/draw', '/game', '/quiz', '/question', '/plans', '/pet', '/compose?kind=photo', '/mood', '/connect', '/welcome', '/call']) {
+  for (const route of ['/', '/chat', '/together', '/story', '/us', '/draw', '/game', '/quiz', '/question', '/plans', '/pet', '/compose?kind=photo', '/mood', '/connect', '/welcome', '/call', '/adventures', '/journal', '/milestones', '/trivia', '/legal']) {
     await page.goto(`${base}${route}`, { waitUntil: 'networkidle' });
+    if (!['/welcome'].includes(route)) assert.ok(!(await page.url()).endsWith('/welcome'), `Route ${route} must load the requested screen`);
     const scan = await page.evaluate(() => ({
       documentOverflow: document.documentElement.scrollWidth > innerWidth + 1,
       clipped: [...document.querySelectorAll('[role="button"], [role="tab"], [role="radio"], input, textarea')].map(node => {
         const r = node.getBoundingClientRect();
-        return { label: node.getAttribute('aria-label') || node.textContent?.trim().slice(0, 80), x: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), visible: r.width > 0 && r.height > 0 };
+        let parent = node.parentElement; let horizontal = false;
+        while (parent) { if (['auto','scroll'].includes(getComputedStyle(parent).overflowX) && parent.scrollWidth > parent.clientWidth + 1) { horizontal = true; break; } parent = parent.parentElement; }
+        return { label: node.getAttribute('aria-label') || node.textContent?.trim().slice(0, 80), x: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width), visible: r.width > 0 && r.height > 0 && !horizontal };
       }).filter(item => item.visible && (item.x < -1 || item.right > innerWidth + 1)),
     }));
     results.push({ route, ...scan });

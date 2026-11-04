@@ -28,7 +28,7 @@ export default function Connect() {
   const { me, partner } = usePeople();
 
   const origin = space.originStory;
-  const isAlreadyLinked = Boolean(origin?.isLinked);
+  const isAlreadyLinked = Boolean(session && space.profiles.length === 2 && space.profiles.every(profile => profile.id !== 'partner'));
   const partnerDisplay =
     partner?.nickname || origin?.partnerNickname || partner?.name || origin?.partnerName || 'Your Partner';
 
@@ -164,7 +164,7 @@ export default function Connect() {
       </View>
 
       {/* 1. YOUR UNIQUE CONNECTION CODE TO SHARE (ONLY BEFORE ONE-TIME LINK IS COMPLETE) */}
-      {!isAlreadyLinked && (
+      {!isAlreadyLinked && session && (
         <Card style={{ gap: 16, backgroundColor: C.pale, borderColor: C.green }}>
           <View style={{ gap: 4 }}>
             <T kind="label" style={{ color: C.green }}>
@@ -374,7 +374,7 @@ export default function Connect() {
       {/* 3. OPTIONAL CLOUD ACCOUNT SYNC WHEN SUPABASE IS CONFIGURED */}
       {supabase && !session ? (
         <Card style={{ gap: 16 }}>
-          <T kind="sub">Optional: Cloud account sign-in</T>
+          <T kind="sub">Sign in to connect your phones</T>
           <View style={S.wrap}>
             <Chip title="Create account" selected={signUp} onPress={() => setSignUp(true)} />
             <Chip title="Sign in" selected={!signUp} onPress={() => setSignUp(false)} />

@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
-import { answerTriviaQuestion, buildPartnerAlertForJournal, buildPartnerAlertForPhotoMoment, buildPartnerAlertForQuickNote, cleanText, clearCompletedErrands, createAdventureGoal, createDemo, createErrandItem, createJournalEntry, createQuickNote, createTriviaQuestion, dateKey, DEFAULT_PARTNER_ALERT_PREFS, diffNewPartnerActivities, generateSixDigitInviteCode, generateUniqueConnectionCode, isValidConnectionCode, makeId, normalizeConnectionCode, shouldSendPartnerAlert, validDate, dropPiece, newGame, removeErrandItem, removeQuickNote, sharedDay, toggleAdventureArchived, toggleAdventureCompleted, toggleErrandItem, toggleJournalHeart, toggleQuickNoteHeart, toggleQuickNotePin, updateQuickNoteCaption, upsertMoodLog, QUIZ, type AdventureCategory, type AdventureGoal, type CoupleOriginStory, type ErrandCategory, type ErrandItem, type JournalEntry, type JournalTag, type MoodId, type MoodLog, type PartnerAlertKind, type PartnerAlertPreferences, type PartnerNotificationItem, type Space, type Moment, type Plan, type Stroke, type PetKind, type CareAction, type TriviaQuestion, type QuickNote, type QuickNoteColor } from './domain';
+import { answerTriviaQuestion, buildPartnerAlertForJournal, buildPartnerAlertForQuickNote, cleanText, clearCompletedErrands, createAdventureGoal, createDemo, createErrandItem, createJournalEntry, createQuickNote, createTriviaQuestion, dateKey, DEFAULT_PARTNER_ALERT_PREFS, diffNewPartnerActivities, generateSixDigitInviteCode, generateUniqueConnectionCode, isValidConnectionCode, makeId, normalizeConnectionCode, validDate, dropPiece, newGame, removeErrandItem, removeQuickNote, sharedDay, toggleAdventureArchived, toggleAdventureCompleted, toggleErrandItem, toggleJournalHeart, toggleQuickNoteHeart, toggleQuickNotePin, updateQuickNoteCaption, upsertMoodLog, QUIZ, type AdventureCategory, type AdventureGoal, type CoupleOriginStory, type ErrandCategory, type ErrandItem, type JournalEntry, type JournalTag, type MoodId, type MoodLog, type PartnerAlertKind, type PartnerAlertPreferences, type PartnerNotificationItem, type Space, type Moment, type Plan, type Stroke, type PetKind, type CareAction, type TriviaQuestion, type QuickNote, type QuickNoteColor } from './domain';
 import { client, generateSupabaseInvitationCode, messageFrom, planFrom, readMessages, readSpace, supabase, verifyAndLinkSupabaseAccounts, writePhoto } from './lib/supabase';
 import { configureExpoNotificationHandler, dispatchPartnerNotification, getNotificationPermissionStatus, requestNotificationPermissions, type NotificationPermissionState } from './notifications';
 import { addBreadcrumb, captureException, setMonitoringUser } from './monitoring';
@@ -44,7 +44,7 @@ type State = {
   triggerPartnerAlertPreview: (kind: PartnerAlertKind) => Promise<void>;
   sendMessage: (text: string, id: string) => Promise<void>; loadEarlierMessages: () => Promise<void>;
   adoptPet: (name: string, kind: PetKind) => Promise<void>; carePet: (action: CareAction) => Promise<void>; renamePet: (name: string) => Promise<void>;
-  answer: (text: string) => Promise<void>; updateProfile: (name: string, start: string) => Promise<void>;
+  answer: (text: string, displayedDay: string) => Promise<void>; updateProfile: (name: string, start: string) => Promise<void>;
   switchPartner: () => void; resetDemo: () => Promise<void>; refresh: () => Promise<void>; signOut: () => Promise<void>;
   onboarded: boolean;
   setup: (mode: Space['mode'], name: string, partnerName: string) => Promise<void>;
@@ -53,7 +53,7 @@ type State = {
   generateConnectionCode: () => Promise<string>;
   redeemConnectionCode: (code: string, partnerNameOverride?: string) => Promise<void>;
   setMode: (mode: Space['mode']) => Promise<void>; addStroke: (stroke: Stroke) => Promise<void>; undoStroke: () => Promise<void>; clearCanvas: () => Promise<void>; saveCanvas: (title: string) => Promise<void>;
-  startGame: () => Promise<void>; playMove: (id: string, column: number) => Promise<void>; submitQuiz: (choices: number[]) => Promise<void>;
+  startGame: () => Promise<void>; playMove: (id: string, column: number) => Promise<void>; submitQuiz: (choices: number[], displayedDay: string) => Promise<void>;
 };
 const Context = createContext<State | null>(null);
 
@@ -73,6 +73,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState('');
   const [connection, setConnection] = useState<Connection>('connecting');
   const [notifications, setNotifications] = useState<PartnerNotificationItem[]>([]);
+  const [notificationOwner, setNotificationOwner] = useState('');
   const [notificationPrefs, setNotificationPrefs] = useState<PartnerAlertPreferences>(DEFAULT_PARTNER_ALERT_PREFS);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('undetermined');
   const notificationPrefsRef = useRef<PartnerAlertPreferences>(DEFAULT_PARTNER_ALERT_PREFS);
@@ -81,6 +82,8 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   }, [notificationPrefs]);
   const recordAndDispatchAlerts = useCallback((incoming: PartnerNotificationItem[]) => {
     if (!incoming.length) return;
+    const owner = identity.current ?? 'local';
+    setNotificationOwner(owner);
     setNotifications(prev => {
       const existingIds = new Set(prev.map(item => item.id));
       const fresh = incoming.filter(item => !existingIds.has(item.id));
@@ -89,7 +92,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         void dispatchPartnerNotification(alert, notificationPrefsRef.current);
       }
       const merged = [...fresh, ...prev].slice(0, 40);
-      void AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(merged)).catch(() => {});
+      void AsyncStorage.setItem(`${NOTIFICATIONS_LIST_KEY}.${owner}`, JSON.stringify(merged)).catch(() => {});
       return merged;
     });
   }, []);
@@ -97,6 +100,17 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const sessionId = session?.user.id ?? null;
   const userId = session?.user.id ?? (demoSpace.profiles[0]?.id || 'me');
   const space = sessionId ? (liveSpace.owner === sessionId ? liveSpace.space : blankSpace()) : demoSpace;
+  useEffect(() => {
+    if (!ready) return;
+    let active = true; const owner = sessionId ?? 'local';
+    void AsyncStorage.getItem(`${NOTIFICATIONS_LIST_KEY}.${owner}`).then(raw => {
+      if (!active) return;
+      let saved: PartnerNotificationItem[] = [];
+      try { const parsed = raw ? JSON.parse(raw) : []; if (Array.isArray(parsed)) saved = parsed; } catch {}
+      setNotifications(saved); setNotificationOwner(owner);
+    });
+    return () => { active = false; };
+  }, [ready, sessionId]);
   const refreshVersion = useRef(0);
   const setSpace = useCallback((change: (previous: Space) => Space) => {
     if (!sessionId) {
@@ -126,8 +140,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
       let storedOrigin: CoupleOriginStory | undefined = demoSpace.originStory;
       if (loaded.id) {
         try {
-          const rawLogs = await AsyncStorage.getItem(`closer.moodLogs.${loaded.id}`);
-          if (rawLogs) { const parsed = JSON.parse(rawLogs); if (Array.isArray(parsed)) storedLogs = parsed; }
+          storedLogs = loaded.moodLogs ?? [];
           const rawAdv = await AsyncStorage.getItem(`closer.adventures.${loaded.id}`);
           if (rawAdv) { const parsedAdv = JSON.parse(rawAdv); if (Array.isArray(parsedAdv)) storedAdventures = parsedAdv; }
           const rawJournal = await AsyncStorage.getItem(`closer.journal.${loaded.id}`);
@@ -190,6 +203,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         realtimeConnected.current = false;
         setIdentityVersion(identityEpoch.current);
         setLiveSpace({ owner: nextId, space: blankSpace() }); setError(''); setToast('');
+        setNotifications([]); setNotificationOwner('');
         setConnection(nextSession ? 'connecting' : 'live');
         addBreadcrumb({ category: 'auth', level: 'info', message: nextId ? 'Authenticated session active' : 'Session signed out or local mode' });
       }
@@ -199,11 +213,11 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => { authEventReceived = true; receiveSession(nextSession); });
     (async () => {
       try {
-        await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+        // Keep the previous version's local data when importing an update.
         const [savedOnboarding, savedPrefs, savedNotifs, permStatus] = await Promise.all([
           AsyncStorage.getItem(ONBOARDING_STORAGE_KEY),
           AsyncStorage.getItem(NOTIFICATION_PREFS_KEY),
-          AsyncStorage.getItem(NOTIFICATIONS_LIST_KEY),
+          Promise.resolve(null),
           getNotificationPermissionStatus(),
         ]);
         if (active) {
@@ -232,6 +246,8 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
             setOnboarded(Boolean(parsed.onboarded));
           }
         }
+      } catch { if (active) setError('Could not restore your saved local space.'); }
+      try {
         if (supabase) {
           const result = await supabase.auth.getSession();
           if (result.error) throw result.error;
@@ -297,12 +313,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         moodLogs: upsertMoodLog(s.moodLogs ?? [], entry),
       }));
     } else {
-      await checked(client().from('profiles').update({ mood, mood_note: note.trim(), need, mood_updated_at: nowIso }).eq('id', userId));
-      if (current.id) {
-        const nextLogs = upsertMoodLog(current.moodLogs ?? [], entry);
-        await AsyncStorage.setItem(`closer.moodLogs.${current.id}`, JSON.stringify(nextLogs)).catch(() => {});
-        setSpace(s => ({ ...s, moodLogs: nextLogs }));
-      }
+      await checked(client().rpc('log_mood', { feeling: mood, note: note.trim(), support: need }));
       await refresh();
     }
     hapticSuccess();
@@ -323,9 +334,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     }
     if (kind === 'photo') {
       hapticInstantPic();
-      const senderName = current.profiles.find(p => p.id === userId)?.name || current.originStory?.myName || 'You';
-      const alert = buildPartnerAlertForPhotoMoment(createdMoment, senderName);
-      recordAndDispatchAlerts([alert]);
+      // Partner alerts are produced on the recipient's refresh, not on the sender.
     } else {
       hapticSuccess();
     }
@@ -387,8 +396,9 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
       await refresh();
     }
   };
-  const answer = async (text: string) => {
-    requirePair(); const body = cleanText(text); const day = sharedDay(current.timeZone);
+  const answer = async (text: string, displayedDay: string) => {
+    requirePair(); const body = cleanText(text); const day = displayedDay;
+    if (day !== sharedDay(current.timeZone)) throw new Error('A new day has started. Open today’s question and try again.');
     if (current.answers.some(a => a.day === day && a.authorId === userId)) throw new Error('You’ve already answered today. Come back tomorrow for a new question.');
     if (demo || isLocalSpace) mutateDemo(s => ({ ...s, answers: [...s.answers, { id: makeId(), authorId: userId, day, text: body }] }));
     else { await checked(client().from('daily_answers').insert({ couple_id: current.id, author_id: userId, day, body })); await refresh(); }
@@ -420,8 +430,8 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
       ...originStory,
       inviteCode: originStory.inviteCode ? normalizeConnectionCode(originStory.inviteCode) : generateUniqueConnectionCode(myDisplayName),
       joinedCode: normalizedJoined,
-      isLinked: Boolean(originStory.isLinked || normalizedJoined),
-      linkedAt: originStory.linkedAt || (normalizedJoined ? nowIso : undefined),
+      isLinked: Boolean(sessionId && originStory.isLinked),
+      linkedAt: sessionId ? originStory.linkedAt : undefined,
       acceptedTerms: originStory.acceptedTerms ?? true,
       acceptedPrivacy: originStory.acceptedPrivacy ?? true,
       legalAcceptedAt: originStory.legalAcceptedAt || nowIso,
@@ -472,11 +482,11 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
           : [],
     };
 
-    await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ space: builtSpace, onboarded: true })).catch(() => {});
+    if (!sessionId) await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ space: builtSpace, onboarded: true }));
     if (current.id) {
       await AsyncStorage.setItem(`closer.originStory.${current.id}`, JSON.stringify(finalizedOrigin)).catch(() => {});
     }
-    setDemoSpace(builtSpace);
+    if (!sessionId) setDemoSpace(builtSpace);
     if (sessionId) {
       setSpace(s => ({
         ...s,
@@ -526,6 +536,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     await applyOriginSpace(current.mode, nextOrigin);
   };
   const generateConnectionCode = async (): Promise<string> => {
+    if (!sessionId || !supabase) throw new Error('Sign in to create a live invitation for your partner.');
     if (sessionId && supabase) {
       const invited = await generateSupabaseInvitationCode(
         current.mode,
@@ -544,7 +555,8 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     return code;
   };
   const redeemConnectionCode = async (rawCode: string, partnerNameOverride?: string) => {
-    if (current.originStory?.isLinked) {
+    if (!sessionId || !supabase) throw new Error('Sign in before linking phones. A code must be verified with your partner’s account.');
+    if (current.profiles.length === 2 && current.profiles.every(profile => profile.id !== 'partner')) {
       throw new Error('Your accounts are already linked. Partner code redemption is a one-time process.');
     }
     if (!isValidConnectionCode(rawCode)) {
@@ -649,8 +661,9 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     if (demo || isLocalSpace) { const next = dropPiece(game, column, game.turn); mutateDemo(s => ({ ...s, games: s.games.map(g => g.id === id ? next : g) })); }
     else { await checked(client().rpc('play_move', { game_id: id, col: column })); await refresh(); }
   };
-  const submitQuiz = async (choices: number[]) => {
-    requirePair(); const day = sharedDay(current.timeZone);
+  const submitQuiz = async (choices: number[], displayedDay: string) => {
+    requirePair(); const day = displayedDay;
+    if (day !== sharedDay(current.timeZone)) throw new Error('A new day has started. Open today’s quiz and try again.');
     if (choices.length !== QUIZ.length || choices.some(x => x !== 0 && x !== 1)) throw new Error('Choose one answer for every question.');
     if (current.quizzes.some(q => q.authorId === userId && q.day === day)) throw new Error('Your choices are already saved for today.');
     if (demo || isLocalSpace) mutateDemo(s => ({ ...s, quizzes: [...s.quizzes, { authorId: userId, day, choices }] }));
@@ -736,14 +749,10 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem(`closer.journal.${current.id}`, JSON.stringify(nextList)).catch(() => {});
       setSpace(s => ({ ...s, journal: nextList }));
     }
-    const senderName = current.profiles.find(p => p.id === userId)?.name || current.originStory?.myName || 'You';
-    const alert = buildPartnerAlertForJournal(entry, senderName);
-    recordAndDispatchAlerts([alert]);
+    // This journal is stored on this device until shared journal syncing is added.
     hapticSuccess();
     setToast(
-      shouldSendPartnerAlert('journal', notificationPrefs)
-        ? 'Entry added & partner notified ♡'
-        : 'Entry added to your Shared Journal ♡'
+      'Journal entry saved on this device ♡'
     );
   };
   const heartJournalEntry = async (id: string) => {
@@ -812,18 +821,11 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     }
     if (imageUri) hapticInstantPic();
     else hapticQuickNote();
-    const senderName = current.profiles.find(p => p.id === userId)?.name || current.originStory?.myName || 'You';
-    const alert = buildPartnerAlertForQuickNote(note, senderName);
-    recordAndDispatchAlerts([alert]);
-    const alertEnabled = shouldSendPartnerAlert(alert.kind, notificationPrefs);
+    // Saving a local note does not deliver a notification to another phone.
     setToast(
       imageUri
-        ? alertEnabled
-          ? 'Instant pic shared & partner alerted ♡'
-          : 'Instant pic shared to your partner’s widget ♡'
-        : alertEnabled
-          ? 'Sticky note pinned & partner alerted ♡'
-          : 'Sticky note left on your partner’s board ♡'
+        ? 'Instant pic saved on this device ♡'
+        : 'Sticky note saved on this device ♡'
     );
   };
   const updateQuickNoteText = async (id: string, text: string) => {
@@ -946,14 +948,14 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const markNotificationRead = (id: string) => {
     setNotifications(prev => {
       const next = prev.map(item => (item.id === id ? { ...item, read: true } : item));
-      void AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(next)).catch(() => {});
+      void AsyncStorage.setItem(`${NOTIFICATIONS_LIST_KEY}.${sessionId ?? 'local'}`, JSON.stringify(next)).catch(() => {});
       return next;
     });
   };
   const markAllNotificationsRead = () => {
     setNotifications(prev => {
       const next = prev.map(item => ({ ...item, read: true }));
-      void AsyncStorage.setItem(NOTIFICATIONS_LIST_KEY, JSON.stringify(next)).catch(() => {});
+      void AsyncStorage.setItem(`${NOTIFICATIONS_LIST_KEY}.${sessionId ?? 'local'}`, JSON.stringify(next)).catch(() => {});
       return next;
     });
   };
@@ -1014,7 +1016,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     setToast(`Dispatched ${kind === 'journal' ? 'Shared Journal' : kind === 'instant-pic' ? 'Instant Pic' : 'Quick Note'} alert ♡`);
   };
 
-  return <Context.Provider value={{ space: current, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, completeOnboarding, updateOriginStory, generateConnectionCode, redeemConnectionCode, setMode, addStroke, undoStroke, clearCanvas, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, addAdventure, toggleAdventure, archiveAdventure, addJournalEntry, heartJournalEntry, addTriviaQuestion, guessTriviaQuestion, addQuickNote, updateQuickNoteText, heartQuickNote, pinQuickNote, deleteQuickNote, addErrand, toggleErrand, deleteErrand, clearDoneErrands, notifications, notificationPrefs, notificationPermission, enableNotifications, updateNotificationPrefs, markNotificationRead, markAllNotificationsRead, triggerPartnerAlertPreview, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ space: current, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, completeOnboarding, updateOriginStory, generateConnectionCode, redeemConnectionCode, setMode, addStroke, undoStroke, clearCanvas, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, addAdventure, toggleAdventure, archiveAdventure, addJournalEntry, heartJournalEntry, addTriviaQuestion, guessTriviaQuestion, addQuickNote, updateQuickNoteText, heartQuickNote, pinQuickNote, deleteQuickNote, addErrand, toggleErrand, deleteErrand, clearDoneErrands, notifications: notificationOwner === (sessionId ?? 'local') ? notifications : [], notificationPrefs, notificationPermission, enableNotifications, updateNotificationPrefs, markNotificationRead, markAllNotificationsRead, triggerPartnerAlertPreview, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
 }
 export function useSpace() { const value = useContext(Context); if (!value) throw new Error('SpaceProvider is missing'); return value; }
 export function usePeople() {

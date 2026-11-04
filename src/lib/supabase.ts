@@ -3,7 +3,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { decode } from 'base64-arraybuffer';
 import {
-  generateSixDigitInviteCode,
   isValidConnectionCode,
   normalizeConnectionCode,
   type Answer,
@@ -61,7 +60,7 @@ export async function generateSupabaseInvitationCode(
   });
   if (!primary.error && primary.data) {
     return {
-      code: String(primary.data.code || generateSixDigitInviteCode()),
+      code: String(primary.data.code || ''),
       couple_id: String(primary.data.couple_id || ''),
       expires_at: String(primary.data.expires_at || new Date(Date.now() + 10 * 60000).toISOString()),
     };
@@ -74,7 +73,7 @@ export async function generateSupabaseInvitationCode(
     });
     check(fallback.error);
     return {
-      code: String(fallback.data?.code || generateSixDigitInviteCode()),
+      code: String(fallback.data?.code || ''),
       couple_id: String(fallback.data?.couple_id || ''),
       expires_at: String(fallback.data?.expires_at || new Date(Date.now() + 10 * 60000).toISOString()),
     };
@@ -154,10 +153,11 @@ export async function readSpace(userId: string): Promise<Space> {
     db.from('chat_messages').select('*').eq('couple_id', coupleId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(100),
     db.from('pets').select('*').eq('couple_id', coupleId).maybeSingle(),
     db.from('pet_care').select('*').eq('couple_id', coupleId).order('day', { ascending: false }).order('created_at', { ascending: false }).limit(180),
+    db.rpc('get_mood_history'),
   ]);
   // Old live spaces remain usable while the additive migration is being deployed.
-  results.forEach((result, index) => { if (index >= 8 && ['42P01', 'PGRST205'].includes(result.error?.code ?? '')) return; check(result.error); });
-  const [couple, profiles, moments, plans, answers, canvas, games, quizzes, messages, pet, care] = results;
+  results.forEach((result, index) => { if (index >= 8 && index < 11 && ['42P01', 'PGRST205'].includes(result.error?.code ?? '')) return; check(result.error); });
+  const [couple, profiles, moments, plans, answers, canvas, games, quizzes, messages, pet, care, history] = results;
   const photoPaths = (moments.data ?? []).filter((row: any) => row.photo_path).map((row: any) => row.photo_path as string);
   const photoUrls = new Map<string, string>();
   if (photoPaths.length) {
@@ -167,6 +167,8 @@ export async function readSpace(userId: string): Promise<Space> {
   return {
     id: coupleId, startedOn: (couple.data as any).started_on, mode: (couple.data as any).mode, timeZone: (couple.data as any).time_zone,
     profiles: (profiles.data ?? []).map(profileFrom),
+    moodLogs: (history.data?.entries ?? []).map((entry: any) => ({ authorId: entry.authorId, day: entry.day, mood: entry.mood, note: '', need: '', createdAt: entry.updatedAt })),
+    moodStreaks: history.data?.streaks ?? [],
     moments: (moments.data ?? []).map((row: any): Moment => ({ id: row.id, authorId: row.author_id, kind: row.kind, text: row.body, drawing: row.drawing ?? undefined, createdAt: row.created_at, image: photoUrls.get(row.photo_path), storagePath: row.photo_path, hearts: row.reactions?.map((r: any) => r.user_id) ?? [] })),
     plans: (plans.data ?? []).map(planFrom),
     answers: (answers.data ?? []).map((row: any): Answer => ({ id: row.id, authorId: row.author_id, day: row.day, text: row.body })),

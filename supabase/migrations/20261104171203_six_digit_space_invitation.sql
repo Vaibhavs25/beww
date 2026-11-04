@@ -48,9 +48,10 @@ begin
   loop
     attempt := attempt + 1;
     -- Generate a 6-digit numeric code between 100000 and 999999
-    code := lpad((floor(random() * 900000)::integer + 100000)::text, 6, '0');
+    code := (((('x' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8))::bit(32)::bigint) % 900000) + 100000)::text;
     code_digest := sha256(convert_to(code, 'UTF8'));
-    exit when not exists(select 1 from private.pair_invites where code_hash = code_digest) or attempt >= 25;
+    exit when not exists(select 1 from private.pair_invites where code_hash = code_digest);
+    if attempt >= 25 then raise exception 'Could not create an invitation. Please try again.'; end if;
   end loop;
 
   insert into private.pair_invites(code_hash, couple_id, created_by, expires_at)
@@ -123,7 +124,15 @@ begin
     if (select count(*) from public.couple_members where couple_id = old_cid) <> 1 then
       return jsonb_build_object('error', 'You already have a connected partner.');
     end if;
-    if exists(select 1 from public.moments where couple_id = old_cid) then
+    if exists(select 1 from public.moments where couple_id = old_cid)
+      or exists(select 1 from public.plans where couple_id = old_cid)
+      or exists(select 1 from public.chat_messages where couple_id = old_cid)
+      or exists(select 1 from public.daily_answers where couple_id = old_cid)
+      or exists(select 1 from public.quiz_answers where couple_id = old_cid)
+      or exists(select 1 from public.canvas_strokes where couple_id = old_cid)
+      or exists(select 1 from public.games where couple_id = old_cid)
+      or exists(select 1 from public.pets where couple_id = old_cid)
+      or exists(select 1 from public.mood_entries where couple_id = old_cid) then
       return jsonb_build_object('error', 'This account already has a shared story.');
     end if;
     delete from public.couples where id = old_cid;

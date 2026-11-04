@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { MessageCircle, ArrowLeftRight, RefreshCw } from 'lucide-react-native';
+import { View } from 'react-native';
+import { MessageCircle, ArrowLeftRight } from 'lucide-react-native';
 import { Avatar, BackLink, Button, C, Card, F, Field, Page, S, T } from '../components/ui';
 import { dailyQuestionItemFor, sharedDay, visibleAnswers } from '../domain';
 import { usePeople, useSpace } from '../store';
@@ -16,8 +16,7 @@ function DailyQuestionView({ day }: { day: string }) {
   const { space, userId, demo, switchPartner, run, answer, busy } = useSpace();
   const { partner } = usePeople();
   const [text, setText] = useState('');
-  const [offset, setOffset] = useState(0);
-  const item = dailyQuestionItemFor(day, offset);
+  const item = dailyQuestionItemFor(day);
   const mine = space.answers.find(a => a.authorId === userId && a.day === day);
   const visible = visibleAnswers(space.answers, day, userId);
 
@@ -33,28 +32,6 @@ function DailyQuestionView({ day }: { day: string }) {
                 {item.tag} · {item.index + 1}/{item.total}
               </T>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Shuffle daily question prompt"
-              onPress={() => setOffset(prev => prev + 1)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: 10,
-                backgroundColor: C.paper,
-                borderWidth: 1,
-                borderColor: C.line,
-                opacity: pressed ? 0.72 : 1,
-              })}
-            >
-              <RefreshCw size={13} color={C.ink} strokeWidth={1.6} />
-              <T style={{ fontSize: 12, fontFamily: F.medium, color: C.ink }}>
-                {offset === 0 ? 'Shuffle prompt' : 'Next prompt'}
-              </T>
-            </Pressable>
           </View>
           <T kind="serif">“{item.prompt}”</T>
           <T kind="small" style={{ fontFamily: F.italic }}>
@@ -95,7 +72,7 @@ function DailyQuestionView({ day }: { day: string }) {
               disabled={!text.trim()}
               loading={busy}
               onPress={() => {
-                void run(() => answer(text));
+                void run(() => answer(text, day));
               }}
             />
           </>

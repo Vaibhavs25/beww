@@ -12,12 +12,15 @@ begin
     (stranger,'authenticated','authenticated','{"display_name":"Verification outsider"}');
   perform set_config('role','authenticated',true);
   perform set_config('request.jwt.claim.sub',first_user::text,true);
-  invitation := public.create_invite('distance','Asia/Kolkata');
+  invitation := public.generate_invitation_code('distance','Asia/Kolkata');
+  if (invitation->>'code') !~ '^[0-9]{6}$' then raise exception 'Invitation is not six digits'; end if;
   perform set_config('request.jwt.claim.sub',second_user::text,true);
-  joined := public.join_couple(invitation->>'code');
+  joined := public.verify_and_link_space(invitation->>'code');
   if joined ? 'error' then raise exception 'Verification pairing failed'; end if;
   perform set_config('request.jwt.claim.sub',first_user::text,true);
   perform public.send_chat_message(message_id,'A private verification message');
+  perform public.log_mood('low'); perform public.log_mood('calm');
+  if jsonb_array_length(public.get_mood_history()->'entries') <> 1 then raise exception 'Mood update was duplicated'; end if;
   perform public.send_chat_message(message_id,'A private verification message');
   if (select count(*) from public.chat_messages) <> 1 then raise exception 'Message retry was duplicated'; end if;
   pet := public.adopt_pet('Mochi','bear');
@@ -40,4 +43,4 @@ begin
 end;
 $$;
 rollback;
-select 'PASS: hosted pairing, chat retry, partner pet care, date reconfirmation, and outsider isolation; all verification data rolled back' as result;
+select 'PASS: hosted six-digit pairing, daily moods, chat retry, pet care, date reconfirmation, and outsider isolation; all verification data rolled back' as result;
