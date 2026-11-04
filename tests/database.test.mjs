@@ -145,4 +145,36 @@ test('database migrations and access boundaries', async t => {
     for(let i=0;i<11;i++) result=await scalar("select public.join_couple('0000000000')");
     assert.match(result.error,/15 minutes/);
   });
+  await t.test('generate_invitation_code creates a unique 6-digit code and verify_and_link_space links two accounts once',async () => {
+    const p1 = '55555555-5555-4555-8555-555555555555';
+    const p2 = '66666666-6666-4666-8666-666666666666';
+    await db.exec('reset role');
+    for (const [id,name] of [[p1,'Riya'],[p2,'Aarav']]) {
+      await db.query('insert into auth.users(id,raw_user_meta_data) values ($1,$2)',[id,{display_name:name}]);
+    }
+    await as(null,'anon');
+    await assert.rejects(db.query('select public.generate_invitation_code()'),/permission denied/);
+    await assert.rejects(db.query("select public.verify_and_link_space('123456')"),/permission denied/);
+
+    await as(p1);
+    const sixInvite = await scalar("select public.generate_invitation_code('distance','Asia/Kolkata')");
+    assert.match(sixInvite.code,/^[0-9]{6}$/);
+    assert.ok(sixInvite.couple_id);
+
+    // Creator cannot redeem their own 6-digit code
+    const selfAttempt = await scalar('select public.verify_and_link_space($1)',[sixInvite.code]);
+    assert.ok(selfAttempt.error);
+
+    // Partner verifies and links account using the 6-digit code
+    await as(p2);
+    const linked = await scalar('select public.verify_and_link_space($1)',[`CLSR-${sixInvite.code}`]);
+    assert.equal(linked.couple_id,sixInvite.couple_id);
+    assert.equal(linked.linked,true);
+    assert.equal(linked.mode,'distance');
+    assert.equal((await db.query('select * from public.profiles')).rows.length,2);
+
+    // 6-digit code is strictly one-time use and cannot be reused
+    await as(p1);
+    await assert.rejects(db.query("select public.generate_invitation_code('distance','Asia/Kolkata')"),/already connected/);
+  });
 });

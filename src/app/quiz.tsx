@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { ArrowLeftRight, Heart, Check, Sparkles } from 'lucide-react-native';
 import { BackLink, Button, C, Card, F, Page, S, T } from '../components/ui';
+import { RelationshipQuiz } from '../components/relationship-quiz';
 import { quizFor, quizMatch, sharedDay } from '../domain';
 import { usePeople, useSpace } from '../store';
 import { useNow } from '../use-now';
@@ -115,6 +116,7 @@ function DailyQuiz({ day }: { day: string }) {
         <T kind="small" style={{ textAlign: 'center', fontFamily: F.italic }}>
           No right answers. Just a little more you.
         </T>
+        <RelationshipQuiz />
       </View>
     </Page>
   );

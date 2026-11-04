@@ -8,9 +8,10 @@ import { quizMatch, sharedDay } from '../../domain';
 import { PetPortrait } from '../../components/pet-portrait';
 import { DailyQuestion } from '../../components/daily-question';
 import { FutureAdventures } from '../../components/future-adventures';
+import { RelationshipQuiz } from '../../components/relationship-quiz';
 
 export default function Together() {
-  const { space, demo, userId } = useSpace();
+  const { space, userId } = useSpace();
   const { me, partner } = usePeople();
   const { width } = useWindowDimensions();
   const day = sharedDay(space.timeZone);
@@ -110,7 +111,6 @@ export default function Together() {
             <Trophy size={15} color={C.muted} />
             <T kind="small">
               {todayGames.length ? `${todayGames.length} finished ${todayGames.length === 1 ? 'round' : 'rounds'} today` : 'Your first round is waiting'}
-              {demo ? ' · local demo' : ''}
             </T>
           </View>
         </Card>
@@ -127,6 +127,7 @@ export default function Together() {
           <Button title={mine ? 'See our choices' : 'Find our match'} compact secondary icon={Heart} onPress={() => router.push('/quiz')} />
         </Card>
       </View>
+      <RelationshipQuiz />
       <DailyQuestion day={day} />
       <FutureAdventures maxItems={3} />
       <Button title="Plan our next little adventure" secondary icon={CalendarDays} onPress={() => router.push('/plans')} />

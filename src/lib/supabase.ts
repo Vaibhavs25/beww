@@ -2,7 +2,22 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { decode } from 'base64-arraybuffer';
-import type { Answer, ChatMessage, Moment, Pet, PetCare, Plan, Profile, Space, Game, QuizAnswer, Stroke } from '../domain';
+import {
+  generateSixDigitInviteCode,
+  isValidConnectionCode,
+  normalizeConnectionCode,
+  type Answer,
+  type ChatMessage,
+  type Moment,
+  type Pet,
+  type PetCare,
+  type Plan,
+  type Profile,
+  type Space,
+  type Game,
+  type QuizAnswer,
+  type Stroke,
+} from '../domain';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -18,6 +33,103 @@ export function profileFrom(row: Record<string, any>): Profile {
 export function messageFrom(row: Record<string, any>): ChatMessage { return { id: row.id, authorId: row.author_id, text: row.body, createdAt: row.created_at }; }
 export function planFrom(row: Record<string, any>): Plan { return { id: row.id, authorId: row.author_id, title: row.title, date: row.planned_on ?? '', kind: row.kind, done: row.done, time: row.planned_time ?? '', place: row.place ?? '', notes: row.notes ?? '', format: row.format ?? 'in-person', acceptedBy: row.accepted_by ?? [], revision: row.revision ?? 1 }; }
 export function petFrom(row: Record<string, any>): Pet { return { name: row.name, kind: row.kind, points: row.care_points, adoptedAt: row.adopted_at }; }
+
+export type SupabaseInvitation = {
+  code: string;
+  couple_id: string;
+  expires_at: string;
+};
+
+export type VerifyAndLinkResult = {
+  couple_id: string;
+  linked: boolean;
+  space?: Space;
+};
+
+/**
+ * Generates a unique 6-digit invitation code in Supabase and initializes the creator's Space
+ * (`couples` + seat 1 in `couple_members`).
+ */
+export async function generateSupabaseInvitationCode(
+  relationshipMode: Space['mode'] = 'nearby',
+  sharedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+): Promise<SupabaseInvitation> {
+  const db = client();
+  const primary = await db.rpc('generate_invitation_code', {
+    relationship_mode: relationshipMode,
+    shared_time_zone: sharedTimeZone,
+  });
+  if (!primary.error && primary.data) {
+    return {
+      code: String(primary.data.code || generateSixDigitInviteCode()),
+      couple_id: String(primary.data.couple_id || ''),
+      expires_at: String(primary.data.expires_at || new Date(Date.now() + 10 * 60000).toISOString()),
+    };
+  }
+  // Fallback to legacy create_invite RPC if the 6-digit migration has not been applied to remote DB yet
+  if (primary.error && ['PGRST202', '42883'].includes(primary.error.code ?? '')) {
+    const fallback = await db.rpc('create_invite', {
+      relationship_mode: relationshipMode,
+      shared_time_zone: sharedTimeZone,
+    });
+    check(fallback.error);
+    return {
+      code: String(fallback.data?.code || generateSixDigitInviteCode()),
+      couple_id: String(fallback.data?.couple_id || ''),
+      expires_at: String(fallback.data?.expires_at || new Date(Date.now() + 10 * 60000).toISOString()),
+    };
+  }
+  check(primary.error);
+  throw new Error('Could not generate a 6-digit invitation code.');
+}
+
+/**
+ * Verifies a 6-digit invitation code and links two user accounts in Supabase
+ * (`couple_members` seat 1 & seat 2) to establish their shared Space.
+ */
+export async function verifyAndLinkSupabaseAccounts(
+  rawInviteCode: string,
+  userId?: string
+): Promise<VerifyAndLinkResult> {
+  if (!isValidConnectionCode(rawInviteCode)) {
+    throw new Error('Enter a valid 6-digit invitation code.');
+  }
+  const normalized = normalizeConnectionCode(rawInviteCode).replace(/[^A-Z0-9]/g, '');
+  const db = client();
+  let resultData: Record<string, any> | null = null;
+
+  const primary = await db.rpc('verify_and_link_space', { invite_code: normalized });
+  if (!primary.error) {
+    resultData = primary.data;
+  } else if (['PGRST202', '42883'].includes(primary.error.code ?? '')) {
+    const fallback = await db.rpc('join_couple', { invite_code: normalized });
+    check(fallback.error);
+    resultData = fallback.data;
+  } else {
+    check(primary.error);
+  }
+
+  if (resultData?.error) {
+    throw new Error(String(resultData.error));
+  }
+  const coupleId = String(resultData?.couple_id || '');
+  if (!coupleId) {
+    throw new Error('Could not verify invitation code or establish your shared Space.');
+  }
+
+  let uid = userId;
+  if (!uid) {
+    const authUser = await db.auth.getUser();
+    uid = authUser.data.user?.id;
+  }
+  const space = uid ? await readSpace(uid) : undefined;
+  return {
+    couple_id: coupleId,
+    linked: true,
+    space,
+  };
+}
+
 export async function readMessages(coupleId: string, before?: ChatMessage) {
   let query = client().from('chat_messages').select('*').eq('couple_id', coupleId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(100);
   if (before) query = query.or(`created_at.lt.${before.createdAt},and(created_at.eq.${before.createdAt},id.lt.${before.id})`);
@@ -70,10 +182,14 @@ export async function readSpace(userId: string): Promise<Space> {
 
 export async function writePhoto(coupleId: string, userId: string, base64: string, text: string) {
   const db = client();
-  const bytes = decode(base64);
+  const cleanBase64 = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
+  const bytes = decode(cleanBase64);
   if (bytes.byteLength > 5 * 1024 * 1024) throw new Error('This photo is too large. Please choose a smaller one.');
   const path = `${coupleId}/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-  const uploaded = await db.storage.from('couple-photos').upload(path, bytes, { contentType: 'image/jpeg', upsert: false }); check(uploaded.error);
+  const uploaded = await db.storage
+    .from('couple-photos')
+    .upload(path, bytes, { contentType: 'image/jpeg', cacheControl: '31536000', upsert: false });
+  check(uploaded.error);
   const inserted = await db.from('moments').insert({ couple_id: coupleId, author_id: userId, kind: 'photo', body: text, photo_path: path });
   if (inserted.error) { await db.storage.from('couple-photos').remove([path]); check(inserted.error); }
 }

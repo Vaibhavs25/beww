@@ -4,16 +4,27 @@
     "slug": "closer-couples",
     "scheme": "closercouples",
     "version": "1.0.0",
+    "description": "Closer is a private shared space for two partners to share daily moods, 1-click instant pics, sticky quick notes, a 30-day memory lane, daily questions, date night plans, future adventures, a shared journal, relationship trivia, drawings, and calls.",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "primaryColor": "#9E3B33",
+    "backgroundColor": "#FAF5EE",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.closer.couples"
+      "bundleIdentifier": "app.closer.couples",
+      "buildNumber": "1",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationCategoryType": "public.app-category.lifestyle"
+      }
     },
     "android": {
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#EEE5F7",
+        "backgroundColor": "#FAF5EE",
+        "backgroundImage": "./assets/android-icon-background.png",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
@@ -24,7 +35,11 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
       "output": "single",
-      "name": "Closer — your little world, together"
+      "name": "Closer — Your Little World, Together",
+      "shortName": "Closer",
+      "description": "Closer is a private shared space for two partners to share daily moods, 1-click instant pics, sticky quick notes, a 30-day memory lane, daily questions, date night plans, future adventures, a shared journal, relationship trivia, drawings, and calls.",
+      "themeColor": "#FAF5EE",
+      "backgroundColor": "#FAF5EE"
     },
     "plugins": [
       "expo-router",

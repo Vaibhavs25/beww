@@ -1,8 +1,60 @@
 {
   "name": "Closer",
-  "description": "A private shared space for two partners to share moods, photos, notes, drawings, games, and plans.",
+  "description": "Closer is a private shared space for two partners to share daily moods, 1-click instant pics, sticky quick notes, a 30-day memory lane, daily questions, date night plans, future adventures, a shared journal, relationship trivia, drawings, and calls.",
+  "version": "1.0.0",
+  "primaryCategory": "Lifestyle",
+  "secondaryCategory": "Social Networking",
+  "categories": [
+    "Lifestyle",
+    "Social Networking"
+  ],
+  "tags": [
+    "lifestyle",
+    "couples",
+    "relationships",
+    "shared-journal",
+    "bucket-list",
+    "date-planner",
+    "private-messaging"
+  ],
+  "icon": "./assets/icon.png",
+  "icons": {
+    "appStore1024": "./assets/icon.png",
+    "playStore512": "./assets/icon.png",
+    "adaptiveForeground": "./assets/android-icon-foreground.png",
+    "adaptiveBackground": "./assets/android-icon-background.png",
+    "adaptiveMonochrome": "./assets/android-icon-monochrome.png",
+    "splash": "./assets/splash-icon.png",
+    "vector": "./assets/closer-mark.svg",
+    "favicon": "./assets/favicon.png"
+  },
+  "storeSubmission": {
+    "ios": {
+      "bundleIdentifier": "app.closer.couples",
+      "primaryCategory": "LIFESTYLE",
+      "secondaryCategory": "SOCIAL_NETWORKING",
+      "highResolutionIcon": "./assets/icon.png",
+      "iconSize": "1024x1024",
+      "ageRating": "4+"
+    },
+    "android": {
+      "packageName": "app.closer.couples",
+      "applicationCategory": "LIFESTYLE",
+      "primaryCategoryTag": "Lifestyle",
+      "highResolutionIcon": "./assets/icon.png",
+      "iconSize": "512x512",
+      "adaptiveIcon": {
+        "foreground": "./assets/android-icon-foreground.png",
+        "background": "./assets/android-icon-background.png",
+        "monochrome": "./assets/android-icon-monochrome.png"
+      }
+    }
+  },
   "requestFramePermissions": [
     "camera",
     "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
 }

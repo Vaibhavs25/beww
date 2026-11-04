@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, View } from 'react-native';
 import { router } from 'expo-router';
 import { Camera, Heart, X } from 'lucide-react-native';
 import { recentPhotoMoments, relativeTime, type Moment } from '../domain';
+import { getCdnImageUri, prefetchDashboardImages } from '../lib/image-cdn';
 import { useSpace } from '../store';
 import { useNow } from '../use-now';
 import { Avatar, Button, C, Card, F, IconButton, S, SectionTitle, T } from './ui';
@@ -14,6 +15,13 @@ export function MemoryLane() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const activePhoto: Moment | undefined = photos.find(p => p.id === selectedId);
   const authorFor = (authorId: string) => space.profiles.find(p => p.id === authorId)?.name ?? 'Your partner';
+
+  useEffect(() => {
+    prefetchDashboardImages(
+      photos.map(p => p.image),
+      'card'
+    );
+  }, [photos]);
 
   return (
     <View style={{ gap: 4 }}>
@@ -71,7 +79,7 @@ export function MemoryLane() {
                 <View style={{ borderRadius: 10, overflow: 'hidden', backgroundColor: C.pale }}>
                   <Image
                     accessibilityLabel={item.text || `Photo shared by ${author}`}
-                    source={{ uri: item.image }}
+                    source={{ uri: getCdnImageUri(item.image, 'card', { width: 410, height: 284, quality: 75 }) }}
                     style={{ width: '100%', height: 142 }}
                     resizeMode="cover"
                   />
@@ -140,7 +148,7 @@ export function MemoryLane() {
               <View style={{ backgroundColor: '#FAF5EE', padding: 10, borderRadius: 14, borderWidth: 1, borderColor: C.line }}>
                 <Image
                   accessibilityLabel={activePhoto.text || 'Shared photo'}
-                  source={{ uri: activePhoto.image }}
+                  source={{ uri: getCdnImageUri(activePhoto.image, 'full', { width: 960, quality: 85 }) }}
                   style={{ width: '100%', height: 280, borderRadius: 10 }}
                   resizeMode="cover"
                 />

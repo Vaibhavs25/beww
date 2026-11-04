@@ -4,6 +4,7 @@ import { ArrowLeftRight, CalendarDays, Check, CheckCheck, Circle, Clock, Heart, 
 import { BackLink, Button, C, Card, Chip, Empty, F, Field, Page, S, T } from '../components/ui';
 import { FeatureNotice } from '../components/feature-notice';
 import { PetPortrait } from '../components/pet-portrait';
+import { MilestoneCalendarCard } from '../components/relationship-clock';
 import { planVoteCount, sharedDay, type Plan } from '../domain';
 import { DATE_IDEAS, type PlanDraft } from '../shared-features';
 import { usePeople, useSpace } from '../store';
@@ -74,6 +75,7 @@ function DatePlanner() {
       <BackLink />
       <FeatureNotice />
       <View style={{ width: '100%', maxWidth: 760, alignSelf: 'center', gap: 22 }}>
+        <MilestoneCalendarCard />
         {demo && (
           <Button
             title={`Plan as ${partner?.name ?? 'your partner'}`}

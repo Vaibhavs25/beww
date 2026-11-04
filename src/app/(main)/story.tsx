@@ -6,6 +6,7 @@ import { Button, Chip, Empty, Page, S, T } from '../../components/ui';
 import { useSpace } from '../../store';
 import { MomentCard } from '../../components/moment-card';
 import { SharedJournal } from '../../components/shared-journal';
+import { OriginStoryCard } from '../../components/relationship-clock';
 
 export default function Story() {
   const { space } = useSpace();
@@ -27,6 +28,7 @@ export default function Story() {
       eyebrow="KEEP THE LITTLE THINGS"
       action={<Button title="Add" compact icon={Plus} onPress={() => router.push('/compose')} />}
     >
+      <OriginStoryCard />
       <View style={S.wrap}>
         {['All', 'Photos', 'Notes', 'Drawings'].map(f => (
           <Chip key={f} title={f} selected={f === filter} onPress={() => setFilter(f)} />

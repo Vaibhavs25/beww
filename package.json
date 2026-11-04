@@ -21,6 +21,7 @@
     "expo-image-manipulator": "~57.0.21",
     "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.13",
+    "expo-notifications": "~57.0.23",
     "expo-router": "~57.0.29",
     "expo-status-bar": "~57.0.1",
     "lucide-react-native": "^1.66.0",
@@ -44,7 +45,7 @@
   },
   "scripts": {
     "dev": "node scripts/preview-server.mjs",
-    "build": "expo export --platform web --max-workers 2 && node scripts/preview-server.mjs --patch-only",
+    "build": "node scripts/preview-server.mjs --build",
     "start": "node scripts/preview-server.mjs",
     "expo": "expo start",
     "android": "expo start --android",
@@ -59,7 +60,7 @@
     "test:config": "node tests/native-config.mjs",
     "test:layout": "node --experimental-strip-types tests/layout-audit.mjs",
     "preview": "node scripts/preview-server.mjs",
-    "build:web": "expo export --platform web --max-workers 2"
+    "build:web": "node scripts/preview-server.mjs --build"
   },
   "private": true
 }

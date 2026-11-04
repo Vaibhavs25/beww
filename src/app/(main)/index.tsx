@@ -1,9 +1,9 @@
 import React from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowRight, Camera, Heart, PenLine, Phone, LockKeyhole, Flame } from 'lucide-react-native';
+import { ArrowRight, Camera, Heart, PenLine, Phone, LockKeyhole, Flame, Zap } from 'lucide-react-native';
 import { usePeople, useSpace } from '../../store';
-import { coupleMoodTimeline, daysTogether, moodFor, relativeTime, sharedDay } from '../../domain';
+import { coupleMoodTimeline, moodFor, relativeTime, sharedDay } from '../../domain';
 import { Avatar, Bloom, Button, C, Card, CoupleAvatars, F, Page, S, SectionTitle, T } from '../../components/ui';
 import { MomentCard } from '../../components/moment-card';
 import { MemoryLane } from '../../components/memory-lane';
@@ -11,10 +11,16 @@ import { DailyQuestion } from '../../components/daily-question';
 import { DateNightPlanner } from '../../components/date-night-planner';
 import { FutureAdventures } from '../../components/future-adventures';
 import { SharedJournal } from '../../components/shared-journal';
+import { RelationshipQuiz } from '../../components/relationship-quiz';
+import { QuickNotes, pickAndPrepareInstantPhoto } from '../../components/quick-notes';
+import { DailyErrands } from '../../components/daily-errands';
+import { RelationshipClockCard } from '../../components/relationship-clock';
+import { PartnerNotificationCenterCard } from '../../components/partner-notifications';
+import { hapticInstantPic, hapticTap } from '../../haptics';
 import { useNow } from '../../use-now';
 
 export default function Today() {
-  const { space, demo, userId } = useSpace();
+  const { space, userId, run, addQuickNote } = useSpace();
   const { me, partner } = usePeople();
   const { width } = useWindowDimensions();
   const wide = width > 1120;
@@ -25,13 +31,14 @@ export default function Today() {
   const quiet = recentMood && (partner?.need === 'Quiet time' || partner?.mood === 'space');
   const todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId);
+  const partnerDisplay = partner?.nickname || space.originStory?.partnerNickname || partner?.name || '?';
 
   return (
     <Page
       title={`A little closer, ${me.name}.`}
       subtitle="It’s the little things that make a life together."
       eyebrow={todayLabel.toUpperCase()}
-      action={width > 700 ? <CoupleAvatars names={[me.name, partner?.name ?? '?']} size={49} /> : undefined}
+      action={width > 700 ? <CoupleAvatars names={[me.name, partnerDisplay]} avatars={[me.avatar, partner?.avatar]} size={49} /> : undefined}
     >
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24, alignItems: 'stretch' }}>
         <View style={{ flex: wide ? 1.65 : undefined, gap: 24 }}>
@@ -48,7 +55,7 @@ export default function Today() {
           >
             <View style={[S.between, { flexWrap: 'wrap' }]}>
               <T numberOfLines={2} kind="label" style={{ color: mood.color, flexShrink: 1 }}>
-                {partner ? `IN ${partner.name.toUpperCase()}’S WORLD` : 'YOUR LITTLE WORLD'}
+                {partner ? `IN ${partnerDisplay.toUpperCase()}’S WORLD` : 'YOUR LITTLE WORLD'}
               </T>
               <T kind="small" style={{ color: mood.color, fontFamily: F.medium }}>
                 {recentMood ? `${mood.emoji} ${mood.label}` : 'A quiet check-in'}
@@ -108,7 +115,7 @@ export default function Today() {
             <SectionTitle title="And how are you, really?" link="Check in" onPress={() => router.push('/mood')} />
             <View style={S.between}>
               <View style={[S.row, { flex: 1, minWidth: 0 }]}>
-                <Avatar name={me.name} />
+                <Avatar name={me.name} uri={me.avatar} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <T numberOfLines={1} style={{ fontFamily: F.medium }}>
                     {moodFor(me.mood).emoji} Feeling {moodFor(me.mood).label.toLowerCase()}
@@ -121,7 +128,10 @@ export default function Today() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Update your mood"
-                onPress={() => router.push('/mood')}
+                onPress={() => {
+                  hapticTap();
+                  router.push('/mood');
+                }}
                 style={{ backgroundColor: C.bg, borderRadius: 20, padding: 12, borderWidth: 1, borderColor: C.line }}
               >
                 <ArrowRight size={18} color={C.green} />
@@ -139,7 +149,7 @@ export default function Today() {
                   </T>
                 </View>
                 <T kind="small">
-                  {me.name.slice(0, 12)} {timeline.myStreak}d · {(partner?.name ?? 'Partner').slice(0, 12)} {timeline.partnerStreak}d
+                  {me.name.slice(0, 12)} {timeline.myStreak}d · {partnerDisplay.slice(0, 12)} {timeline.partnerStreak}d
                 </T>
               </View>
 
@@ -151,7 +161,7 @@ export default function Today() {
                     <View
                       key={slot.day}
                       accessible
-                      accessibilityLabel={`${slot.weekday} ${slot.dayNum}: ${myMood ? `${me.name} ${myMood.label}` : `${me.name} not logged`}, ${theirMood ? `${partner?.name ?? 'partner'} ${theirMood.label}` : 'partner not logged'}`}
+                      accessibilityLabel={`${slot.weekday} ${slot.dayNum}: ${myMood ? `${me.name} ${myMood.label}` : `${me.name} not logged`}, ${theirMood ? `${partnerDisplay} ${theirMood.label}` : 'partner not logged'}`}
                       style={{
                         flex: 1,
                         alignItems: 'center',
@@ -203,10 +213,12 @@ export default function Today() {
                 })}
               </View>
               <T kind="small" style={{ fontSize: 11 }}>
-                Top row is {me.name} · bottom row is {partner?.name ?? 'your partner'}
+                Top row is {me.name} · bottom row is {partnerDisplay}
               </T>
             </View>
           </Card>
+
+          <QuickNotes />
 
           <MemoryLane />
 
@@ -228,33 +240,43 @@ export default function Today() {
         </View>
 
         <View style={{ flex: wide ? 1 : undefined, gap: 23 }}>
-          <Card style={{ backgroundColor: '#3A2622', borderColor: '#3A2622', alignItems: 'center', gap: 10, paddingVertical: 26 }}>
-            <CoupleAvatars names={[me.name, partner?.name ?? '?']} />
-            <T style={{ fontFamily: F.serif, fontSize: 48, lineHeight: 60, color: '#FAF5EE' }}>
-              {space.startedOn ? daysTogether(space.startedOn, todayKey) : '♡'}
-            </T>
-            <T kind="small" style={{ color: '#E6D5C8', marginTop: -11 }}>
-              days of choosing each other
-            </T>
-            <View style={{ width: 32, height: 1, backgroundColor: '#7A5B52', marginVertical: 5 }} />
-            <T style={{ fontSize: 12, color: '#E6D5C8', fontFamily: F.italic }}>
-              {space.mode === 'distance' ? 'Different places. One shared table.' : 'Close by. Closer every day.'}
-            </T>
-          </Card>
+          <RelationshipClockCard
+            startedAt={space.originStory?.relationshipStartedAt || space.startedOn}
+            mode={space.mode}
+            myName={me.name}
+            partnerName={partner?.name ?? 'Partner'}
+            partnerNickname={partnerDisplay}
+            myAvatar={me.avatar}
+            partnerAvatar={partner?.avatar}
+          />
+
+          <PartnerNotificationCenterCard compact />
 
           <View>
             <SectionTitle title="Leave something on their desk" />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               {[
-                { title: 'Photo', icon: Camera, path: '/compose?kind=photo', color: C.yellow },
-                { title: 'Doodle', icon: PenLine, path: '/draw', color: C.rose },
-                { title: 'Call', icon: Phone, path: '/call', color: C.pale },
-              ].map(({ title, icon: Icon, path, color }) => (
+                {
+                  title: 'Instant Pic',
+                  icon: Zap,
+                  color: C.yellow,
+                  onPress: () => {
+                    hapticInstantPic();
+                    void run(async () => {
+                      const uri = await pickAndPrepareInstantPhoto(false);
+                      if (uri) await addQuickNote('', 'butter', uri);
+                    });
+                  },
+                },
+                { title: 'Photo', icon: Camera, color: '#F6E8D5', onPress: () => { hapticTap(); router.push('/compose?kind=photo'); } },
+                { title: 'Doodle', icon: PenLine, color: C.rose, onPress: () => { hapticTap(); router.push('/draw'); } },
+                { title: 'Call', icon: Phone, color: C.pale, onPress: () => { hapticTap(); router.push('/call'); } },
+              ].map(({ title, icon: Icon, color, onPress }) => (
                 <Pressable
                   key={title}
                   accessibilityRole="button"
-                  accessibilityLabel={title === 'Call' ? 'Call your partner' : `Send a ${title.toLowerCase()}`}
-                  onPress={() => router.push(path as '/draw')}
+                  accessibilityLabel={title === 'Call' ? 'Call your partner' : `Send ${title.toLowerCase()}`}
+                  onPress={onPress}
                   style={({ pressed }) => ({
                     flex: 1,
                     alignItems: 'center',
@@ -276,6 +298,10 @@ export default function Today() {
 
           <DateNightPlanner />
 
+          <DailyErrands />
+
+          <RelationshipQuiz maxItems={2} />
+
           <FutureAdventures maxItems={3} />
 
           <View style={{ alignItems: 'center', padding: 10, gap: 8 }}>
@@ -290,7 +316,7 @@ export default function Today() {
       <View style={{ flexDirection: 'row', gap: 7, justifyContent: 'center', alignItems: 'center' }}>
         <LockKeyhole size={12} color={C.muted} />
         <T kind="small" style={{ fontSize: 10 }}>
-          {demo ? 'Demo changes stay on this device. Switch partners using the badge above.' : 'Your shared space. Just the two of you.'}
+          Your shared space · Just the two of you.
         </T>
       </View>
     </Page>
