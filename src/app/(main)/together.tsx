@@ -1,22 +1,135 @@
 import React from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowUpRight, PenLine, Video, Grid3X3, Heart, Trophy, MessageCircle, CalendarDays } from 'lucide-react-native';
+import { ArrowUpRight, PenLine, Video, Grid3X3, Heart, Trophy, CalendarDays } from 'lucide-react-native';
 import { Button, C, Card, F, Page, S, SectionTitle, T } from '../../components/ui';
 import { usePeople, useSpace } from '../../store';
-import { questionFor, quizMatch, sharedDay } from '../../domain';
+import { quizMatch, sharedDay } from '../../domain';
 import { PetPortrait } from '../../components/pet-portrait';
+import { DailyQuestion } from '../../components/daily-question';
+import { FutureAdventures } from '../../components/future-adventures';
 
 export default function Together() {
-  const { space, demo, userId } = useSpace(); const { me, partner } = usePeople(); const { width } = useWindowDimensions();
-  const day = sharedDay(space.timeZone); const todayGames = space.games.filter(g => g.finishedAt && sharedDay(space.timeZone, new Date(g.finishedAt)) === day);
-  const mine = space.quizzes.find(q => q.authorId === userId && q.day === day); const theirs = space.quizzes.find(q => q.authorId !== userId && q.day === day); const match = mine && theirs ? quizMatch(mine.choices, theirs.choices) : null;
-  const activities = [{ title: 'Our little canvas', subtitle: 'Make a beautiful mess together.', icon: PenLine, color: C.rose, route: '/draw', tag: 'CREATE TOGETHER' }, { title: 'Four in a Row', subtitle: 'A little friendly competition.', icon: Grid3X3, color: C.pale, route: '/game', tag: 'PLAY TOGETHER' }, { title: 'This or That', subtitle: 'Discover your little similarities.', icon: Heart, color: C.yellow, route: '/quiz', tag: 'GET TO KNOW US' }];
-  return <Page title="Our kind of quality time." subtitle="A little laughter. A little creativity. A lot of us." eyebrow="TOGETHER, WHEREVER"><Card style={{ backgroundColor: C.green, borderColor: C.green, padding: 28 }}><View style={[S.between, { flexWrap: 'wrap', gap: 20 }]}><View style={{ gap: 8, flex: 1, minWidth: 200 }}><T kind="label" style={{ color: '#F3CFDE' }}>JUST A CALL AWAY</T><T kind="serif" style={{ color: '#fff' }}>Same time. Same little world.</T><T kind="small" style={{ color: '#F8E1EC' }}>Stay on a call while you play or draw.</T></View><Button title="Call your person" icon={Video} secondary onPress={() => router.push('/call')} /></View></Card>
-    <Card style={{ backgroundColor: C.purple, gap: 16 }}><View style={S.row}><PetPortrait kind={space.pet?.kind ?? 'bear'} size={105} /><View style={{ flex: 1, gap: 7 }}><T kind="label" style={{ color: C.green }}>OUR LITTLE FAMILY</T><T kind="serif">{space.pet ? `${space.pet.name} is waiting for you.` : 'A little friend. Raised by two.'}</T><T kind="small">Feed, play, and grow together.</T></View></View><Button title={space.pet ? 'Visit our pet' : 'Meet our pet'} secondary onPress={() => router.push('/pet')} /></Card>
-    <View style={{ flexDirection: width > 1100 ? 'row' : 'column', gap: 18 }}>{activities.map(({ title, subtitle, icon: Icon, color, route, tag }) => <Pressable accessibilityRole="button" accessibilityLabel={title} key={route} onPress={() => router.push(route as '/draw')} style={({ pressed }) => ({ flex: 1, padding: 25, borderRadius: 23, borderColor: C.line, borderWidth: 1, backgroundColor: C.paper, gap: 12, opacity: pressed ? 0.7 : 1 })}><View style={S.between}><View style={{ backgroundColor: color, width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}><Icon size={29} color={C.ink} strokeWidth={1.4} /></View><ArrowUpRight color={C.muted} size={20} strokeWidth={1.4} /></View><T kind="label" style={{ color: C.muted, marginTop: 8 }}>{tag}</T><T kind="serif" style={{ fontSize: 23 }}>{title}</T><T kind="small">{subtitle}</T></Pressable>)}</View>
-    <View style={{ flexDirection: width > 1100 ? 'row' : 'column', gap: 20 }}><Card style={{ flex: 1, gap: 16 }}><SectionTitle title="Today’s little victories" link="Play" onPress={() => router.push('/game')} /><View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>{space.profiles.map(p => <View key={p.id} style={{ alignItems: 'center', gap: 4 }}><T style={{ fontFamily: F.serif, fontSize: 37 }}>{todayGames.filter(g => g.winner && g.players[g.winner - 1] === p.id).length}</T><T kind="small">{p.name}</T></View>)}<View style={{ alignItems: 'center', gap: 4 }}><T style={{ fontFamily: F.serif, fontSize: 37 }}>{todayGames.filter(g => g.winner === 0).length}</T><T kind="small">Draws</T></View></View><View style={[S.row, { justifyContent: 'center' }]}><Trophy size={15} color={C.muted} /><T kind="small">{todayGames.length ? `${todayGames.length} finished ${todayGames.length === 1 ? 'round' : 'rounds'} today` : 'Your first round is waiting'}{demo ? ' · local demo' : ''}</T></View></Card>
-    <Card style={{ flex: 1, backgroundColor: C.yellow, gap: 15 }}><T kind="label" style={{ color: '#915575' }}>SAME WAVELENGTH?</T><T kind="serif">{match !== null ? `${match}% little similarities.` : 'Different people. A little overlap.'}</T><T kind="small" style={{ color: '#875C75' }}>{match !== null ? `${me.name} & ${partner?.name} matched on ${Math.round(match / 20)} of 5 choices. A quiz result, not a measure of love.` : 'Answer five playful choices. See what matches once you’ve both answered.'}</T><Button title={mine ? 'See our choices' : 'Find our match'} compact secondary icon={Heart} onPress={() => router.push('/quiz')} /></Card></View>
-    <Card><View style={S.row}><MessageCircle size={22} color={C.green} strokeWidth={1.5} /><T kind="label" style={{ color: C.muted }}>TODAY’S CONVERSATION</T></View><T kind="serif" style={{ marginVertical: 20 }}>{questionFor(day)}</T><Button compact secondary title="Make a little space to talk" onPress={() => router.push('/question')} /></Card><Button title="Plan our next little adventure" secondary icon={CalendarDays} onPress={() => router.push('/plans')} /></Page>;
-}
+  const { space, demo, userId } = useSpace();
+  const { me, partner } = usePeople();
+  const { width } = useWindowDimensions();
+  const day = sharedDay(space.timeZone);
+  const todayGames = space.games.filter(g => g.finishedAt && sharedDay(space.timeZone, new Date(g.finishedAt)) === day);
+  const mine = space.quizzes.find(q => q.authorId === userId && q.day === day);
+  const theirs = space.quizzes.find(q => q.authorId !== userId && q.day === day);
+  const match = mine && theirs ? quizMatch(mine.choices, theirs.choices) : null;
+  const activities = [
+    { title: 'Our little canvas', subtitle: 'Make a beautiful mess together.', icon: PenLine, color: C.rose, route: '/draw', tag: 'CREATE TOGETHER' },
+    { title: 'Four in a Row', subtitle: 'A little friendly competition.', icon: Grid3X3, color: C.pale, route: '/game', tag: 'PLAY TOGETHER' },
+    { title: 'This or That', subtitle: 'Discover your little similarities.', icon: Heart, color: C.yellow, route: '/quiz', tag: 'GET TO KNOW US' },
+  ];
 
+  return (
+    <Page title="Our kind of quality time." subtitle="A little laughter. A little creativity. A lot of us." eyebrow="TOGETHER, WHEREVER">
+      <Card style={{ backgroundColor: C.green, borderColor: C.green, padding: 28 }}>
+        <View style={[S.between, { flexWrap: 'wrap', gap: 20 }]}>
+          <View style={{ gap: 8, flex: 1, minWidth: 200 }}>
+            <T kind="label" style={{ color: '#F3DFDA' }}>
+              JUST A CALL AWAY
+            </T>
+            <T kind="serif" style={{ color: '#FFFDF9' }}>
+              Same time. Same little world.
+            </T>
+            <T kind="small" style={{ color: '#F3DFDA' }}>
+              Stay on a call while you play or draw.
+            </T>
+          </View>
+          <Button title="Call your person" icon={Video} secondary onPress={() => router.push('/call')} />
+        </View>
+      </Card>
+      <Card style={{ backgroundColor: C.purple, gap: 16 }}>
+        <View style={S.row}>
+          <PetPortrait kind={space.pet?.kind ?? 'bear'} size={105} />
+          <View style={{ flex: 1, gap: 7 }}>
+            <T kind="label" style={{ color: C.green }}>
+              OUR LITTLE FAMILY
+            </T>
+            <T kind="serif">{space.pet ? `${space.pet.name} is waiting for you.` : 'A little friend. Raised by two.'}</T>
+            <T kind="small">Feed, play, and grow together.</T>
+          </View>
+        </View>
+        <Button title={space.pet ? 'Visit our pet' : 'Meet our pet'} secondary onPress={() => router.push('/pet')} />
+      </Card>
+      <View style={{ flexDirection: width > 1100 ? 'row' : 'column', gap: 18 }}>
+        {activities.map(({ title, subtitle, icon: Icon, color, route, tag }) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            key={route}
+            onPress={() => router.push(route as '/draw')}
+            style={({ pressed }) => ({
+              flex: 1,
+              padding: 25,
+              borderRadius: 23,
+              borderColor: C.line,
+              borderWidth: 1,
+              backgroundColor: C.paper,
+              gap: 12,
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <View style={S.between}>
+              <View style={{ backgroundColor: color, width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon size={29} color={C.ink} strokeWidth={1.4} />
+              </View>
+              <ArrowUpRight color={C.muted} size={20} strokeWidth={1.4} />
+            </View>
+            <T kind="label" style={{ color: C.muted, marginTop: 8 }}>
+              {tag}
+            </T>
+            <T kind="serif" style={{ fontSize: 23 }}>
+              {title}
+            </T>
+            <T kind="small">{subtitle}</T>
+          </Pressable>
+        ))}
+      </View>
+      <View style={{ flexDirection: width > 1100 ? 'row' : 'column', gap: 20 }}>
+        <Card style={{ flex: 1, gap: 16 }}>
+          <SectionTitle title="Today’s little victories" link="Play" onPress={() => router.push('/game')} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+            {space.profiles.map(p => (
+              <View key={p.id} style={{ alignItems: 'center', gap: 4 }}>
+                <T style={{ fontFamily: F.serif, fontSize: 37 }}>
+                  {todayGames.filter(g => g.winner && g.players[g.winner - 1] === p.id).length}
+                </T>
+                <T kind="small">{p.name}</T>
+              </View>
+            ))}
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <T style={{ fontFamily: F.serif, fontSize: 37 }}>{todayGames.filter(g => g.winner === 0).length}</T>
+              <T kind="small">Draws</T>
+            </View>
+          </View>
+          <View style={[S.row, { justifyContent: 'center' }]}>
+            <Trophy size={15} color={C.muted} />
+            <T kind="small">
+              {todayGames.length ? `${todayGames.length} finished ${todayGames.length === 1 ? 'round' : 'rounds'} today` : 'Your first round is waiting'}
+              {demo ? ' · local demo' : ''}
+            </T>
+          </View>
+        </Card>
+        <Card style={{ flex: 1, backgroundColor: C.yellow, gap: 15 }}>
+          <T kind="label" style={{ color: C.green }}>
+            SAME WAVELENGTH?
+          </T>
+          <T kind="serif">{match !== null ? `${match}% little similarities.` : 'Different people. A little overlap.'}</T>
+          <T kind="small" style={{ color: C.muted }}>
+            {match !== null
+              ? `${me.name} & ${partner?.name} matched on ${Math.round(match / 20)} of 5 choices. A quiz result, not a measure of love.`
+              : 'Answer five playful choices. See what matches once you’ve both answered.'}
+          </T>
+          <Button title={mine ? 'See our choices' : 'Find our match'} compact secondary icon={Heart} onPress={() => router.push('/quiz')} />
+        </Card>
+      </View>
+      <DailyQuestion day={day} />
+      <FutureAdventures maxItems={3} />
+      <Button title="Plan our next little adventure" secondary icon={CalendarDays} onPress={() => router.push('/plans')} />
+    </Page>
+  );
+}

@@ -7,7 +7,7 @@ const browser = await chromium.launch({channel:'chrome',headless:true});
 const context = await browser.newContext({viewport:{width:1440,height:1100},deviceScaleFactor:1});
 const page = await context.newPage(); const errors=[]; const passed=[];
 page.on('pageerror',error => errors.push(error.message));
-const base=process.env.PREVIEW_URL || 'http://localhost:8082';
+const base=process.env.PREVIEW_URL || 'http://localhost:3000';
 page.setDefaultTimeout(20000);
 const check = label => { passed.push(label); console.log(`PASS ${label}`); };
 const persisted = () => page.evaluate(() => JSON.parse(localStorage.getItem('closer.demo.v2')).space);

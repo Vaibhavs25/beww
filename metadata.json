@@ -1,0 +1,8 @@
+{
+  "name": "Closer",
+  "description": "A private shared space for two partners to share moods, photos, notes, drawings, games, and plans.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

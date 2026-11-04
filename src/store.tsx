@@ -2,12 +2,12 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
-import { cleanText, createDemo, makeId, validDate, dropPiece, newGame, sharedDay, QUIZ, type MoodId, type Space, type Moment, type Plan, type Stroke, type PetKind, type CareAction } from './domain';
+import { cleanText, createAdventureGoal, createDemo, createJournalEntry, makeId, validDate, dropPiece, newGame, sharedDay, toggleAdventureArchived, toggleAdventureCompleted, toggleJournalHeart, upsertMoodLog, QUIZ, type AdventureCategory, type AdventureGoal, type JournalEntry, type JournalTag, type MoodId, type MoodLog, type Space, type Moment, type Plan, type Stroke, type PetKind, type CareAction } from './domain';
 import { client, messageFrom, planFrom, readMessages, readSpace, supabase, writePhoto } from './lib/supabase';
 import { adoptPet as newPet, careForPet, mergeMessages, reconcileMessages, validatePlan, type PlanDraft } from './shared-features';
 
 const STORAGE_KEY = 'closer.demo.v2';
-function blankSpace(): Space { return { ...createDemo(), id: '', startedOn: '', profiles: [], moments: [], plans: [], answers: [], canvas: [], games: [], quizzes: [], messages: [], pet: null, petCare: [], featuresReady: false }; }
+function blankSpace(): Space { return { ...createDemo(), id: '', startedOn: '', profiles: [], moodLogs: [], adventures: [], journal: [], moments: [], plans: [], answers: [], canvas: [], games: [], quizzes: [], messages: [], pet: null, petCare: [], featuresReady: false }; }
 type Connection = 'demo' | 'connecting' | 'live' | 'offline';
 type State = {
   space: Space; userId: string; demo: boolean; ready: boolean; busy: boolean; error: string; toast: string; connection: Connection; session: Session | null;
@@ -16,12 +16,14 @@ type State = {
   sendMoment: (kind: Moment['kind'], text: string, photo?: string) => Promise<void>;
   heart: (id: string) => Promise<void>; deleteMoment: (id: string) => Promise<void>;
   savePlan: (draft: PlanDraft, original?: Plan) => Promise<void>; togglePlan: (id: string) => Promise<void>; respondPlan: (plan: Plan, going: boolean) => Promise<void>;
+  addAdventure: (title: string, category: AdventureCategory, notes?: string) => Promise<void>; toggleAdventure: (id: string) => Promise<void>; archiveAdventure: (id: string) => Promise<void>;
+  addJournalEntry: (body: string, title?: string, tag?: JournalTag) => Promise<void>; heartJournalEntry: (id: string) => Promise<void>;
   sendMessage: (text: string, id: string) => Promise<void>; loadEarlierMessages: () => Promise<void>;
   adoptPet: (name: string, kind: PetKind) => Promise<void>; carePet: (action: CareAction) => Promise<void>; renamePet: (name: string) => Promise<void>;
   answer: (text: string) => Promise<void>; updateProfile: (name: string, start: string) => Promise<void>;
   switchPartner: () => void; resetDemo: () => Promise<void>; refresh: () => Promise<void>; signOut: () => Promise<void>;
   onboarded: boolean; setup: (mode: Space['mode'], name: string, partnerName: string) => Promise<void>;
-  setMode: (mode: Space['mode']) => Promise<void>; addStroke: (stroke: Stroke) => Promise<void>; undoStroke: () => Promise<void>; saveCanvas: (title: string) => Promise<void>;
+  setMode: (mode: Space['mode']) => Promise<void>; addStroke: (stroke: Stroke) => Promise<void>; undoStroke: () => Promise<void>; clearCanvas: () => Promise<void>; saveCanvas: (title: string) => Promise<void>;
   startGame: () => Promise<void>; playMove: (id: string, column: number) => Promise<void>; submitQuiz: (choices: number[]) => Promise<void>;
 };
 const Context = createContext<State | null>(null);
@@ -58,9 +60,22 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     const version = ++refreshVersion.current;
     try {
       const loaded = await readSpace(sessionId);
-      const next = loaded.id ? loaded : { ...loaded, mode: demoSpace.mode };
+      let storedLogs: MoodLog[] = [];
+      let storedAdventures: AdventureGoal[] = [];
+      let storedJournal: JournalEntry[] = [];
+      if (loaded.id) {
+        try {
+          const rawLogs = await AsyncStorage.getItem(`closer.moodLogs.${loaded.id}`);
+          if (rawLogs) { const parsed = JSON.parse(rawLogs); if (Array.isArray(parsed)) storedLogs = parsed; }
+          const rawAdv = await AsyncStorage.getItem(`closer.adventures.${loaded.id}`);
+          if (rawAdv) { const parsedAdv = JSON.parse(rawAdv); if (Array.isArray(parsedAdv)) storedAdventures = parsedAdv; }
+          const rawJournal = await AsyncStorage.getItem(`closer.journal.${loaded.id}`);
+          if (rawJournal) { const parsedJournal = JSON.parse(rawJournal); if (Array.isArray(parsedJournal)) storedJournal = parsedJournal; }
+        } catch {}
+      }
+      const next = loaded.id ? { ...loaded, moodLogs: storedLogs, adventures: storedAdventures, journal: storedJournal } : { ...loaded, mode: demoSpace.mode, moodLogs: [], adventures: [], journal: [] };
       if (version !== refreshVersion.current || identityEpoch.current !== identityVersion) return;
-      setLiveSpace(previous => ({ owner: sessionId, space: previous.owner === sessionId && previous.space.id === next.id ? { ...next, ...reconcileMessages(previous.space, next) } : next }));
+      setLiveSpace(previous => ({ owner: sessionId, space: previous.owner === sessionId && previous.space.id === next.id ? { ...next, ...reconcileMessages(previous.space, next), moodLogs: next.moodLogs?.length ? next.moodLogs : previous.space.moodLogs, adventures: next.adventures?.length ? next.adventures : previous.space.adventures, journal: next.journal?.length ? next.journal : previous.space.journal } : next }));
       if (realtimeConnected.current) setConnection('live');
     }
     catch (e) { if (version === refreshVersion.current) { setConnection('offline'); setError(e instanceof Error ? e.message : 'Could not refresh your space.'); } }
@@ -145,9 +160,25 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   };
   const setMood = async (mood: MoodId, note: string, need: string) => {
     if (note.length > 200) throw new Error('Keep your mood note under 200 characters.');
-    if (demo) mutateDemo(s => ({ ...s, profiles: s.profiles.map(p => p.id === userId ? { ...p, mood, moodNote: note.trim(), need, moodAt: new Date().toISOString() } : p) }));
-    else { await checked(client().from('profiles').update({ mood, mood_note: note.trim(), need, mood_updated_at: new Date().toISOString() }).eq('id', userId)); await refresh(); }
-    setToast(demo ? 'Mood updated in your demo space' : 'Your mood is shared');
+    const nowIso = new Date().toISOString();
+    const day = sharedDay(current.timeZone);
+    const entry: MoodLog = { authorId: userId, day, mood, note: note.trim(), need, createdAt: nowIso };
+    if (demo) {
+      mutateDemo(s => ({
+        ...s,
+        profiles: s.profiles.map(p => p.id === userId ? { ...p, mood, moodNote: note.trim(), need, moodAt: nowIso } : p),
+        moodLogs: upsertMoodLog(s.moodLogs ?? [], entry),
+      }));
+    } else {
+      await checked(client().from('profiles').update({ mood, mood_note: note.trim(), need, mood_updated_at: nowIso }).eq('id', userId));
+      if (current.id) {
+        const nextLogs = upsertMoodLog(current.moodLogs ?? [], entry);
+        await AsyncStorage.setItem(`closer.moodLogs.${current.id}`, JSON.stringify(nextLogs)).catch(() => {});
+        setSpace(s => ({ ...s, moodLogs: nextLogs }));
+      }
+      await refresh();
+    }
+    setToast(demo ? 'Mood logged in your demo space' : 'Your daily mood is logged');
   };
   const sendMoment = async (kind: Moment['kind'], text: string, photo?: string) => {
     requirePair();
@@ -193,9 +224,16 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   };
   const respondPlan = async (plan: Plan, going: boolean) => {
     requireFeatures();
-    if (demo) mutateDemo(s => ({ ...s, plans: s.plans.map(p => p.id === plan.id ? { ...p, acceptedBy: [...(p.acceptedBy ?? []).filter(id => id !== userId), ...(going ? [userId] : [])] } : p) }));
-    else { const { data, error: apiError } = await client().rpc('respond_to_plan', { plan_id: plan.id, going, expected_revision: plan.revision ?? 1 }); if (apiError) throw apiError; setSpace(s => ({ ...s, plans: s.plans.map(p => p.id === plan.id ? planFrom(data) : p) })); }
-    setToast(going ? 'A date to look forward to ♡' : 'Your response is updated');
+    if (demo) {
+      mutateDemo(s => ({ ...s, plans: s.plans.map(p => p.id === plan.id ? { ...p, acceptedBy: [...(p.acceptedBy ?? []).filter(id => id !== userId), ...(going ? [userId] : [])] } : p) }));
+    } else if (plan.kind === 'date') {
+      const { data, error: apiError } = await client().rpc('respond_to_plan', { plan_id: plan.id, going, expected_revision: plan.revision ?? 1 });
+      if (apiError) throw apiError;
+      setSpace(s => ({ ...s, plans: s.plans.map(p => p.id === plan.id ? planFrom(data) : p) }));
+    } else {
+      setSpace(s => ({ ...s, plans: s.plans.map(p => p.id === plan.id ? { ...p, acceptedBy: [...(p.acceptedBy ?? []).filter(id => id !== userId), ...(going ? [userId] : [])] } : p) }));
+    }
+    setToast(going ? 'Voted for this date idea ♡' : 'Your vote is updated');
   };
   const togglePlan = async (id: string) => {
     const plan = current.plans.find(p => p.id === id); if (!plan) return;
@@ -250,6 +288,11 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     const stroke = [...current.canvas].reverse().find(s => s.authorId === userId); if (!stroke) return;
     if (demo) mutateDemo(s => ({ ...s, canvas: s.canvas.filter(x => x.id !== stroke.id) }));
     else { await checked(client().from('canvas_strokes').delete().eq('id', stroke.id).eq('author_id', userId)); await refresh(); }
+  };
+  const clearCanvas = async () => {
+    if (demo) mutateDemo(s => ({ ...s, canvas: [] }));
+    else { requirePair(); await checked(client().from('canvas_strokes').delete().eq('couple_id', current.id).eq('author_id', userId)); await refresh(); }
+    setToast(demo ? 'Canvas cleared in your demo' : 'Your marks were cleared from the canvas');
   };
   const saveCanvas = async (title: string) => {
     if (!current.canvas.length) throw new Error('Make a little mark first.');
@@ -309,8 +352,66 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     else { await checked(client().rpc('rename_pet', { pet_name: clean })); await refresh(); }
     setToast('A lovely name for your little friend');
   };
+  const addAdventure = async (title: string, category: AdventureCategory, notes = '') => {
+    requirePair();
+    const goal = createAdventureGoal(userId, title, category, notes);
+    const nextList = [goal, ...(current.adventures ?? [])];
+    if (demo) {
+      mutateDemo(s => ({ ...s, adventures: [goal, ...(s.adventures ?? [])] }));
+    } else if (current.id) {
+      await AsyncStorage.setItem(`closer.adventures.${current.id}`, JSON.stringify(nextList)).catch(() => {});
+      setSpace(s => ({ ...s, adventures: nextList }));
+    }
+    setToast('Added to Future Adventures ♡');
+  };
+  const toggleAdventure = async (id: string) => {
+    requirePair();
+    const nextList = toggleAdventureCompleted(current.adventures ?? [], id);
+    const item = nextList.find(g => g.id === id);
+    if (demo) {
+      mutateDemo(s => ({ ...s, adventures: toggleAdventureCompleted(s.adventures ?? [], id) }));
+    } else if (current.id) {
+      await AsyncStorage.setItem(`closer.adventures.${current.id}`, JSON.stringify(nextList)).catch(() => {});
+      setSpace(s => ({ ...s, adventures: nextList }));
+    }
+    setToast(item?.completed ? 'Adventure completed together!' : 'Moved back to active goals');
+  };
+  const archiveAdventure = async (id: string) => {
+    requirePair();
+    const nextList = toggleAdventureArchived(current.adventures ?? [], id);
+    const item = nextList.find(g => g.id === id);
+    if (demo) {
+      mutateDemo(s => ({ ...s, adventures: toggleAdventureArchived(s.adventures ?? [], id) }));
+    } else if (current.id) {
+      await AsyncStorage.setItem(`closer.adventures.${current.id}`, JSON.stringify(nextList)).catch(() => {});
+      setSpace(s => ({ ...s, adventures: nextList }));
+    }
+    setToast(item?.archived ? 'Goal archived' : 'Goal restored to your list');
+  };
+  const addJournalEntry = async (body: string, title = '', tag: JournalTag = 'reflection') => {
+    requirePair();
+    const entry = createJournalEntry(userId, sharedDay(current.timeZone), body, title, tag);
+    const nextList = [entry, ...(current.journal ?? [])];
+    if (demo) {
+      mutateDemo(s => ({ ...s, journal: [entry, ...(s.journal ?? [])] }));
+    } else if (current.id) {
+      await AsyncStorage.setItem(`closer.journal.${current.id}`, JSON.stringify(nextList)).catch(() => {});
+      setSpace(s => ({ ...s, journal: nextList }));
+    }
+    setToast('Entry added to your Shared Journal ♡');
+  };
+  const heartJournalEntry = async (id: string) => {
+    requirePair();
+    const nextList = toggleJournalHeart(current.journal ?? [], id, userId);
+    if (demo) {
+      mutateDemo(s => ({ ...s, journal: toggleJournalHeart(s.journal ?? [], id, userId) }));
+    } else if (current.id) {
+      await AsyncStorage.setItem(`closer.journal.${current.id}`, JSON.stringify(nextList)).catch(() => {});
+      setSpace(s => ({ ...s, journal: nextList }));
+    }
+  };
 
-  return <Context.Provider value={{ space: current, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, setMode, addStroke, undoStroke, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ space: current, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, setMode, addStroke, undoStroke, clearCanvas, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, addAdventure, toggleAdventure, archiveAdventure, addJournalEntry, heartJournalEntry, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
 }
 export function useSpace() { const value = useContext(Context); if (!value) throw new Error('SpaceProvider is missing'); return value; }
 export function usePeople() {

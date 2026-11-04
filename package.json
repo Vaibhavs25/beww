@@ -43,7 +43,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "dev": "node scripts/preview-server.mjs",
+    "build": "expo export --platform web --max-workers 2 && node scripts/preview-server.mjs --patch-only",
+    "start": "node scripts/preview-server.mjs",
+    "expo": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

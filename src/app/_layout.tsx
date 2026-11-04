@@ -15,6 +15,28 @@ import { C } from '../components/ui';
 import { CallBanner, CallProvider } from '../calls';
 import { CallAudio } from '../components/call-audio';
 
+if (typeof window !== 'undefined') {
+  try {
+    const desc = Object.getOwnPropertyDescriptor(window, 'fetch');
+    if (desc && desc.get && !desc.set && desc.configurable !== false) {
+      const getter = desc.get;
+      let customFetch: typeof window.fetch | null = null;
+      Object.defineProperty(window, 'fetch', {
+        configurable: true,
+        enumerable: desc.enumerable !== false,
+        get() {
+          return customFetch ?? getter.call(window);
+        },
+        set(fn) {
+          if (typeof fn === 'function') customFetch = fn;
+        },
+      });
+    }
+  } catch {
+    // Ignore read-only descriptor errors in restricted environments
+  }
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold, Lora_400Regular, Lora_400Regular_Italic });
   if (!loaded && !error) return <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: 'center' }}><ActivityIndicator color={C.green} /></View>;

@@ -11,7 +11,7 @@ space.profiles[1].name = 'ChristopherChristopherChristop'.slice(0, 30);
 await context.addInitScript(value => localStorage.setItem('closer.demo.v2', JSON.stringify({ space: value, userId: 'alex', onboarded: true })), space);
 const page = await context.newPage(); const results = []; const errors = [];
 page.on('pageerror', error => errors.push(error.message));
-const base = process.env.PREVIEW_URL || 'http://localhost:8082';
+const base = process.env.PREVIEW_URL || 'http://localhost:3000';
 await mkdir('artifacts', { recursive: true });
 try {
   for (const route of ['/', '/chat', '/together', '/story', '/us', '/draw', '/game', '/quiz', '/question', '/plans', '/pet', '/compose?kind=photo', '/mood', '/connect', '/welcome', '/call']) {
