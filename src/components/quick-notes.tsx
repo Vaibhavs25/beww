@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, TextInput, View, useWindowDimensions } from 'react-native';
 import { Camera, Check, Heart, Pin, Plus, Send, Sparkles, StickyNote, Trash2, Zap } from 'lucide-react-native';
 import {
@@ -17,6 +17,7 @@ import { getCdnImageUri, pickAndOptimizeImage, prefetchDashboardImages } from '.
 import { hapticHeart, hapticInstantPic, hapticQuickNote, hapticSelection, hapticWarning } from '../haptics';
 import { usePeople, useSpace } from '../store';
 import { Avatar, Button, C, Card, F, S, SectionTitle, T } from './ui';
+import { CoachMarkTarget } from './dashboard-coach-marks';
 
 export async function pickAndPrepareInstantPhoto(
   camera = false,
@@ -35,6 +36,8 @@ export function QuickNotes() {
   const [color, setColor] = useState<QuickNoteColor>('butter');
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState('');
+  const picRow = useRef<ScrollView>(null);
+  const revealInstantPic = useCallback(() => picRow.current?.scrollTo({ x: 0, animated: false }), []);
 
   const notes = sortQuickNotes(space.quickNotes);
   const activeColor = quickNoteColorMeta(color);
@@ -188,7 +191,7 @@ export function QuickNotes() {
               },
             ]}
           />
-          <Pressable
+          <CoachMarkTarget id="quick-notes"><Pressable
             accessibilityRole="button"
             accessibilityLabel="Post sticky note"
             disabled={busy || !text.trim()}
@@ -207,7 +210,7 @@ export function QuickNotes() {
           >
             <Send size={14} color="#FAF5EE" />
             <T style={{ color: '#FAF5EE', fontSize: 13, fontFamily: F.medium }}>Stick Note</T>
-          </Pressable>
+          </Pressable></CoachMarkTarget>
         </View>
 
         {/* 1-Click Instant Pic Row (Zero multi-click, auto-shares immediately, text optional) */}
@@ -234,11 +237,12 @@ export function QuickNotes() {
           </View>
 
           <ScrollView
+            ref={picRow}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 8, alignItems: 'center' }}
           >
-            <Pressable
+            <CoachMarkTarget id="instant-pic" onReveal={revealInstantPic}><Pressable
               accessibilityRole="button"
               accessibilityLabel="One-click instant photo from device"
               disabled={busy}
@@ -258,7 +262,7 @@ export function QuickNotes() {
               <T style={{ fontSize: 12, fontFamily: F.medium, color: '#FAF5EE' }}>
                 Instant Snap
               </T>
-            </Pressable>
+            </Pressable></CoachMarkTarget>
 
             {INSTANT_PIC_PRESETS.map(preset => (
               <Pressable

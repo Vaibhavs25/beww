@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { ArrowRight, Camera, Heart, PenLine, Phone, LockKeyhole, Flame, Zap } from 'lucide-react-native';
 import { usePeople, useSpace } from '../../store';
 import { coupleMoodTimeline, moodFor, relativeTime, sharedDay } from '../../domain';
-import { Avatar, Bloom, Button, C, Card, CoupleAvatars, F, Page, S, SectionTitle, T } from '../../components/ui';
+import { Avatar, Bloom, Button, C, Card, CoupleAvatars, F, S, SectionTitle, T } from '../../components/ui';
+import { DashboardCoachMarkPage } from '../../components/dashboard-coach-marks';
 import { MomentCard } from '../../components/moment-card';
 import { MemoryLane } from '../../components/memory-lane';
 import { DailyQuestion } from '../../components/daily-question';
@@ -20,7 +21,7 @@ import { hapticInstantPic, hapticTap } from '../../haptics';
 import { useNow } from '../../use-now';
 
 export default function Today() {
-  const { space, userId, run, addQuickNote } = useSpace();
+  const { space, userId, session, run, addQuickNote } = useSpace();
   const { me, partner } = usePeople();
   const { width } = useWindowDimensions();
   const wide = width > 1120;
@@ -34,7 +35,9 @@ export default function Today() {
   const partnerDisplay = partner?.nickname || space.originStory?.partnerNickname || partner?.name || '?';
 
   return (
-    <Page
+    <DashboardCoachMarkPage
+      owner={session?.user.id ?? `local:${space.id}`}
+      eligible={Boolean(space.id)}
       title={`A little closer, ${me.name}.`}
       subtitle="It’s the little things that make a life together."
       eyebrow={todayLabel.toUpperCase()}
@@ -320,6 +323,6 @@ export default function Today() {
           Your shared space · Just the two of you.
         </T>
       </View>
-    </Page>
+    </DashboardCoachMarkPage>
   );
 }

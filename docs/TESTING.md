@@ -20,6 +20,7 @@ $env:PREVIEW_URL = 'http://127.0.0.1:8084'
 npm run test:ui
 npm run test:client
 npm run test:layout
+npm run test:coach-marks
 npm run test:config
 npm run test:backend
 ```
@@ -30,4 +31,8 @@ The browser suites use installed Chrome through Playwright. `test:ui` covers loc
 
 `npm run dev:native` starts Expo development mode. Android/iOS export checks JavaScript and Hermes compatibility; `test:config` introspects native settings. Neither produces an installed, signed app or verifies real camera, microphone, email, push, or WebRTC transport.
 
-Artifacts, screenshots, temporary reports, and exports are written to ignored `artifacts/`. The import audit records 47 unit/database tests, 19 UI scenarios, eight client scenarios, 21 route checks, and 17 hosted anonymous-access checks.
+Artifacts, screenshots, temporary reports, and exports are written to ignored `artifacts/`. The import audit records the baseline verification. With the dashboard coach marks, `npm test` has 51 tests, and `test:coach-marks` adds seven browser scenarios alongside the existing 19 UI scenarios and 21 route checks.
+
+The tour suite checks first dashboard entry from another route, scrolling to the real target buttons, Next/Back, desktop/phone/landscape placement, background scroll blocking, Skip, completion across reloads, independent local-space markers, Escape, and normal note posting after dismissal. It verifies that the tour never posts content or opens the photo picker. Four pure tests cover bounded layout and separate account keys.
+
+Tour completion is saved as `closer.dashboardTips.v1.<owner>` in AsyncStorage. Signed-in owners use their user ID; unsigned owners use `local:<space ID>`. New owners see the tour on their first eligible dashboard visit. Leaving without completing it does not mark it done. Skip, Got it, Escape, and Android back mark it done. If device storage fails, dismissal still works for the current mounted session. Native screen-reader and physical-phone behavior still require device validation.

@@ -42,6 +42,8 @@ try {
   await page.getByRole('checkbox', { name: 'I have read and agree to the Privacy Policy' }).click();
   await page.getByRole('button', { name: 'Accept & Enter Main Dashboard ♡' }).click();
   await page.getByText('A little closer, Ari.', { exact: true }).waitFor();
+  await page.getByRole('dialog', { name: 'Dashboard tips' }).waitFor();
+  await page.getByRole('button', { name: 'Skip tour' }).click();
   assert.equal((await saved()).originStory.isLinked, false);
   await page.reload({ waitUntil: 'networkidle' }); await page.getByText('A little closer, Ari.', { exact: true }).waitFor();
   check('seven-step onboarding enforces agreement, saves the story, and survives reload');
@@ -52,7 +54,7 @@ try {
   assert.equal((await saved()).originStory.isLinked, false); await dismiss();
   check('local code entry cannot falsely link two phones');
 
-  await page.evaluate(({ k, value }) => localStorage.setItem(k, JSON.stringify({ space: value, onboarded: true })), { k: key, value: seed });
+  await page.evaluate(({ k, value }) => { localStorage.setItem(k, JSON.stringify({ space: value, onboarded: true })); localStorage.setItem('closer.dashboardTips.v1.local:demo', 'done'); }, { k: key, value: seed });
   await page.goto(base); await page.reload({ waitUntil: 'networkidle' });
   await page.getByText('A little closer, Alex.', { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Check in', exact: true }).click();

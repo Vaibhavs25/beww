@@ -21,6 +21,7 @@ The [GitHub import audit](docs/GEMINI_IMPORT_AUDIT.md) records the tested Gemini
 | Experience | Behavior |
 | --- | --- |
 | Nearby or long-distance | Onboarding choice; change it later in Our space. |
+| First dashboard tour | Two coach marks highlight Stick Note and Instant Snap, automatically scroll each button into view, and offer Next, Back, Skip, and keyboard/Android-back dismissal. Completion is remembered on this device for the account or local space. |
 | Mood and support | Seven moods, a short note, and what would help. The partner's home adapts to the shared mood; it expires after 24 hours. |
 | Private chat | A dedicated Chat tab with text messages, timestamps, earlier-message loading, and retry without duplicate sends. Each partner speaks as their own account. |
 | A shared pet | Adopt a teddy, cat, puppy, or bunny; choose a name and raise it together. Feeding, play, and rest each earn five points once per partner per shared day. Every thirty points adds a level; no progress is lost for missed days. |

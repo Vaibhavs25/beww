@@ -8,7 +8,7 @@ const context = await browser.newContext({ viewport: { width: 360, height: 800 }
 const space = createDemo();
 space.profiles[0].name = 'AlexandriaAlexandriaAlexandriaXX'.slice(0, 30);
 space.profiles[1].name = 'ChristopherChristopherChristop'.slice(0, 30);
-await context.addInitScript(value => localStorage.setItem('closer.onboardedSpace.v1', JSON.stringify({ space: value, onboarded: true })), space);
+await context.addInitScript(value => { localStorage.setItem('closer.onboardedSpace.v1', JSON.stringify({ space: value, onboarded: true })); localStorage.setItem('closer.dashboardTips.v1.local:demo', 'done'); }, space);
 const page = await context.newPage(); const results = []; const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const base = process.env.PREVIEW_URL || 'http://localhost:3000';
