@@ -19,10 +19,12 @@ import { RelationshipClockCard } from '../../components/relationship-clock';
 import { PartnerNotificationCenterCard } from '../../components/partner-notifications';
 import { hapticInstantPic, hapticTap } from '../../haptics';
 import { useNow } from '../../use-now';
+import { useI18n } from '../../localization';
 
 export default function Today() {
   const { space, userId, session, run, addQuickNote } = useSpace();
   const { me, partner } = usePeople();
+  const { t, locale } = useI18n();
   const { width } = useWindowDimensions();
   const wide = width > 1120;
   const now = useNow(space);
@@ -30,7 +32,7 @@ export default function Today() {
   const recentMood = partner && now >= Date.parse(partner.moodAt) && now - Date.parse(partner.moodAt) < 86400000;
   const mood = moodFor(recentMood ? partner.mood : 'calm');
   const quiet = recentMood && (partner?.need === 'Quiet time' || partner?.mood === 'space');
-  const todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const todayLabel = new Date(now).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: space.timeZone });
   const timeline = coupleMoodTimeline(space.moodLogs, space.profiles, space.timeZone, todayKey, userId, space.moodStreaks);
   const partnerDisplay = partner?.nickname || space.originStory?.partnerNickname || partner?.name || '?';
 
@@ -38,12 +40,12 @@ export default function Today() {
     <DashboardCoachMarkPage
       owner={session?.user.id ?? `local:${space.id}`}
       eligible={Boolean(space.id)}
-      title={`A little closer, ${me.name}.`}
-      subtitle="It’s the little things that make a life together."
+      title={t('home.title', { name: me.name })}
+      subtitle={t('home.subtitle')}
       eyebrow={todayLabel.toUpperCase()}
       action={width > 700 ? <CoupleAvatars names={[me.name, partnerDisplay]} avatars={[me.avatar, partner?.avatar]} size={49} /> : undefined}
     >
-      <T kind="small">Journals, adventures, trivia, sticky notes, and errands are saved on this device.</T>
+      <T kind="small">{t('home.localFeatures')}</T>
       <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24, alignItems: 'stretch' }}>
         <View style={{ flex: wide ? 1.65 : undefined, gap: 24 }}>
           <View

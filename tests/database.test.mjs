@@ -40,6 +40,20 @@ test('database migrations and access boundaries', async t => {
     await as(outsider); assert.ok((await scalar('select public.join_couple($1)',[invite.code])).error); assert.equal((await db.query('select * from public.couples')).rows.length,0);
     await assert.rejects(db.query('select * from private.pair_invites'),/permission denied/);
   });
+  await t.test('profile language defaults safely, persists, validates, and is owner-writable only',async () => {
+    await as(a); assert.equal(await scalar('select language from public.profiles where id=$1',[a]),'en');
+    await db.query("update public.profiles set language='hi' where id=$1",[a]);
+    assert.equal(await scalar('select language from public.profiles where id=$1',[a]),'hi');
+    await assert.rejects(db.query("update public.profiles set language='invalid' where id=$1",[a]),/check constraint/);
+    await assert.rejects(db.query('update public.profiles set language=null where id=$1',[a]),/not-null/);
+    assert.equal((await db.query("update public.profiles set language='hi' where id=$1 returning id",[b])).rows.length,0);
+    await as(b); assert.equal(await scalar('select language from public.profiles where id=$1',[b]),'en');
+    assert.equal((await db.query("update public.profiles set language='en' where id=$1 returning id",[a])).rows.length,0);
+    await as(outsider); assert.equal((await db.query("update public.profiles set language='en' where id=$1 returning id",[a])).rows.length,0);
+    await as(null,'anon'); await assert.rejects(db.query("update public.profiles set language='hi'"),/permission denied/);
+    await as(a); assert.equal(await scalar('select language from public.profiles where id=$1',[a]),'hi');
+    await assert.rejects(db.query('update public.profiles set id=$1 where id=$2',[outsider,a]),/permission denied/);
+  });
   await t.test('moments cannot cross spaces or impersonate a partner',async () => {
     await as(a); await db.query("insert into public.moments(couple_id,author_id,kind,body) values ($1,$2,'note','Thinking of you')",[cid,a]);
     await assert.rejects(db.query("insert into public.moments(couple_id,author_id,kind,body) values ($1,$2,'note','Forged')",[cid,b]),/row-level security/);

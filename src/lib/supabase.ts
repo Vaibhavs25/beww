@@ -2,6 +2,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { decode } from 'base64-arraybuffer';
+import { normalizeLanguage } from '../locales';
 import {
   isValidConnectionCode,
   normalizeConnectionCode,
@@ -27,7 +28,7 @@ export const supabase = url && key ? createClient(url, key, {
 export function client() { if (!supabase) throw new Error('Live sharing is not connected in this preview yet.'); return supabase; }
 function check(error: { message: string } | null) { if (error) throw new Error(error.message); }
 export function profileFrom(row: Record<string, any>): Profile {
-  return { id: row.id, name: row.display_name, mood: row.mood, moodNote: row.mood_note ?? '', need: row.need ?? '', moodAt: row.mood_updated_at };
+  return { id: row.id, name: row.display_name, language: normalizeLanguage(row.language), mood: row.mood, moodNote: row.mood_note ?? '', need: row.need ?? '', moodAt: row.mood_updated_at };
 }
 export function messageFrom(row: Record<string, any>): ChatMessage { return { id: row.id, authorId: row.author_id, text: row.body, createdAt: row.created_at }; }
 export function planFrom(row: Record<string, any>): Plan { return { id: row.id, authorId: row.author_id, title: row.title, date: row.planned_on ?? '', kind: row.kind, done: row.done, time: row.planned_time ?? '', place: row.place ?? '', notes: row.notes ?? '', format: row.format ?? 'in-person', acceptedBy: row.accepted_by ?? [], revision: row.revision ?? 1 }; }

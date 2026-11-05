@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, Camera, Check, Heart, StickyNote, X } from 'luci
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 import { coachMarkLayout, DASHBOARD_TIPS, dashboardTipsKey, type CoachMarkRect, type DashboardTip } from '../coach-marks';
 import { Button, C, F, Page, S, T } from './ui';
+import { useI18n } from '../localization';
 
 type Anchor = { view: View; reveal?: () => void };
 type TargetRegistry = { register: (id: DashboardTip, anchor: Anchor | null) => void };
@@ -30,6 +31,7 @@ function measure(view: View | null): Promise<CoachMarkRect | null> {
 }
 
 function CoachMarkHost({ owner, eligible, pageProps }: { owner: string; eligible: boolean; pageProps: PageProps }) {
+  const { t } = useI18n();
   const pathname = usePathname(); const window = useWindowDimensions();
   const scroll = useRef<ScrollView>(null); const viewport = useRef<View>(null); const modal = useRef<View>(null);
   const anchors = useRef<Partial<Record<DashboardTip, Anchor>>>({}); const scrollY = useRef(0);
@@ -103,13 +105,14 @@ function CoachMarkHost({ owner, eligible, pageProps }: { owner: string; eligible
 
   useEffect(() => {
     if (!shown || !placement) return;
-    const tip = DASHBOARD_TIPS[placement.index];
-    AccessibilityInfo.announceForAccessibility(`Tip ${placement.index + 1} of ${DASHBOARD_TIPS.length}. ${tip.label}. ${tip.body}`);
+    const label = t(placement.index === 0 ? 'tour.quickLabel' : 'tour.picLabel');
+    const body = t(placement.index === 0 ? 'tour.quickBody' : 'tour.picBody');
+    AccessibilityInfo.announceForAccessibility(t('tour.announcement', { step: placement.index + 1, total: DASHBOARD_TIPS.length, label, body }));
     // The web modal traps focus; begin at its explanation, before the controls.
     if (Platform.OS === 'web') title.current?.focus();
-  }, [shown, placement]);
+  }, [shown, placement, t]);
 
-  const tip = placement ? DASHBOARD_TIPS[placement.index] : null;
+  const tip = placement ? { label: t(placement.index === 0 ? 'tour.quickLabel' : 'tour.picLabel'), title: t(placement.index === 0 ? 'tour.quickTitle' : 'tour.picTitle'), body: t(placement.index === 0 ? 'tour.quickBody' : 'tour.picBody') } : null;
   const frame = modalFrame ?? { x: 0, y: 0, width: window.width, height: window.height };
   const target = placement ? { ...placement.target, x: placement.target.x - frame.x, y: placement.target.y - frame.y } : null;
   const layout = target ? coachMarkLayout(target, frame, cardHeight) : null;
@@ -121,7 +124,7 @@ function CoachMarkHost({ owner, eligible, pageProps }: { owner: string; eligible
       <Page {...pageProps} scrollRef={scroll} onScroll={onScroll} scrollEnabled={!shown} />
     </View>
     <Modal transparent visible={shown} animationType="none" statusBarTranslucent onRequestClose={finish} onShow={readModalFrame}>
-      <View ref={modal} collapsable={false} onLayout={readModalFrame} style={{ flex: 1 }} accessibilityViewIsModal role="dialog" accessibilityLabel="Dashboard tips" testID="dashboard-coach-marks">
+      <View ref={modal} collapsable={false} onLayout={readModalFrame} style={{ flex: 1 }} accessibilityViewIsModal role="dialog" accessibilityLabel={t('tour.dialog')} testID="dashboard-coach-marks">
         {layout && tip && <>
           <Svg width="100%" height="100%" style={{ position: 'absolute' }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <Defs><Mask id="dashboard-tip-spotlight"><Rect width="100%" height="100%" fill="white" /><Rect {...layout.highlight} rx={16} fill="black" /></Mask></Defs>
@@ -132,15 +135,15 @@ function CoachMarkHost({ owner, eligible, pageProps }: { owner: string; eligible
           <ScrollView testID="coach-mark-card" style={{ position: 'absolute', ...layout.card, backgroundColor: C.paper, borderRadius: 22, borderWidth: 1, borderColor: '#EADACD' }} contentContainerStyle={{ padding: 21, gap: 16 }} keyboardShouldPersistTaps="handled">
             <View onLayout={event => { const height = event.nativeEvent.layout.height + 42; setCardHeight(previous => Math.abs(previous - height) > 1 ? height : previous); }} style={{ gap: 16 }}>
               <View style={S.between}>
-                <View style={[S.row, { gap: 8 }]}><View style={{ width: 32, height: 32, borderRadius: 11, backgroundColor: placement?.index === 0 ? C.yellow : '#ECE5F3', justifyContent: 'center', alignItems: 'center' }}><Icon size={17} color={C.green} strokeWidth={1.5} /></View><T kind="small" style={{ fontFamily: F.medium, color: C.green }}>A LITTLE TOUR · {(placement?.index ?? 0) + 1} / 2</T></View>
+                <View style={[S.row, { gap: 8 }]}><View style={{ width: 32, height: 32, borderRadius: 11, backgroundColor: placement?.index === 0 ? C.yellow : '#ECE5F3', justifyContent: 'center', alignItems: 'center' }}><Icon size={17} color={C.green} strokeWidth={1.5} /></View><T kind="small" style={{ fontFamily: F.medium, color: C.green }}>{t('tour.label')} · {(placement?.index ?? 0) + 1} / 2</T></View>
                 <Heart size={16} color={C.green} strokeWidth={1.3} />
               </View>
               <View style={{ gap: 7 }}><View ref={title} focusable accessible accessibilityRole="header"><T kind="serif" style={{ fontSize: 24, lineHeight: 32 }}>{tip.label}</T></View><T style={{ fontFamily: F.italic, fontSize: 14, lineHeight: 21 }}>{tip.title}</T><T style={{ fontSize: 13, lineHeight: 21, color: C.muted }}>{tip.body}</T></View>
               <View style={{ flexDirection: 'row', gap: 9 }}>
-                {placement?.index === 1 && <Button title="Back" icon={ArrowLeft} compact secondary disabled={positioning} onPress={() => setRequested(0)} />}
-                <Button title={placement?.index === 0 ? 'Next: Instant Pic' : 'Got it'} icon={placement?.index === 0 ? ArrowRight : Check} compact disabled={positioning} style={{ flex: 1 }} onPress={() => { if (placement?.index === 0) setRequested(1); else finish(); }} />
+                {placement?.index === 1 && <Button title={t('tour.back')} icon={ArrowLeft} compact secondary disabled={positioning} onPress={() => setRequested(0)} />}
+                <Button title={t(placement?.index === 0 ? 'tour.next' : 'tour.done')} icon={placement?.index === 0 ? ArrowRight : Check} compact disabled={positioning} style={{ flex: 1 }} onPress={() => { if (placement?.index === 0) setRequested(1); else finish(); }} />
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Skip tour" onPress={finish} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }}><X size={13} color={C.muted} /><T kind="small">Skip for now</T></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('tour.skipLabel')} onPress={finish} style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }}><X size={13} color={C.muted} /><T kind="small">{t('tour.skip')}</T></Pressable>
             </View>
           </ScrollView>
         </>}

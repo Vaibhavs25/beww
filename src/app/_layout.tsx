@@ -15,6 +15,7 @@ import { C } from '../components/ui';
 import { CallBanner, CallProvider } from '../calls';
 import { CallAudio } from '../components/call-audio';
 import { addBreadcrumb, initErrorMonitoring, MonitoringErrorBoundary } from '../monitoring';
+import { LocalizationProvider } from '../localization';
 
 // Guard globalThis.expo base constructor classes so third-party Expo web modules
 // never encounter `Class extends value undefined` during module evaluation.
@@ -120,11 +121,16 @@ export default function RootLayout() {
     <SafeErrorBoundary>
       <SafeProvider>
         <SpaceProvider>
-          <Screens />
+          <LocalizedScreens />
         </SpaceProvider>
       </SafeProvider>
     </SafeErrorBoundary>
   );
+}
+
+function LocalizedScreens() {
+  const { language } = useSpace();
+  return <LocalizationProvider language={language}><Screens /></LocalizationProvider>;
 }
 
 function Screens() {

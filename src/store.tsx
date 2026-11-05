@@ -8,6 +8,7 @@ import { configureExpoNotificationHandler, dispatchPartnerNotification, getNotif
 import { addBreadcrumb, captureException, setMonitoringUser } from './monitoring';
 import { hapticError, hapticHeart, hapticInstantPic, hapticQuickNote, hapticSelection, hapticSuccess, hapticTaskToggle, hapticWarning, hydrateHapticsPreference } from './haptics';
 import { adoptPet as newPet, careForPet, mergeMessages, reconcileMessages, validatePlan, type PlanDraft } from './shared-features';
+import { isLanguage, normalizeLanguage, translate, type Language } from './locales';
 
 const STORAGE_KEY = 'closer.demo.v2';
 const ONBOARDING_STORAGE_KEY = 'closer.onboardedSpace.v1';
@@ -18,6 +19,7 @@ type Connection = 'demo' | 'connecting' | 'live' | 'offline';
 type State = {
   space: Space; userId: string; demo: boolean; ready: boolean; busy: boolean; error: string; toast: string; connection: Connection; session: Session | null;
   dismissError: () => void; notify: (text: string) => void; run: (fn: () => Promise<void>) => Promise<boolean>;
+  language: Language; setLanguage: (language: Language) => Promise<void>;
   setMood: (mood: MoodId, note: string, need: string) => Promise<void>;
   sendMoment: (kind: Moment['kind'], text: string, photo?: string) => Promise<void>;
   heart: (id: string) => Promise<void>; deleteMoment: (id: string) => Promise<void>;
@@ -290,6 +292,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 4000); return () => clearTimeout(timer); }, [toast]);
 
   const current = space;
+  const language = normalizeLanguage(current.profiles.find(profile => profile.id === userId)?.language);
   const isLocalSpace = !sessionId && Boolean(current.id);
   const requirePair = () => { if (!current.id || current.profiles.length < 2) throw new Error('Connect your partner in Our space before sharing.'); };
   const requireFeatures = () => { requirePair(); if (!current.featuresReady) throw new Error('These new features aren’t available in your live space yet. Please try again later.'); };
@@ -415,6 +418,21 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     }
     setToast('Your space, a little more you');
   };
+  const setLanguage = async (nextLanguage: Language) => {
+    if (!isLanguage(nextLanguage)) throw new Error(translate(language, 'language.failed'));
+    if (!current.profiles.some(profile => profile.id === userId)) throw new Error(translate(language, 'language.setup'));
+    if (sessionId) {
+      const { error: apiError } = await client().from('profiles').update({ language: nextLanguage }).eq('id', userId).select('id,language').single();
+      if (apiError) throw new Error(translate(language, 'language.failed'), { cause: apiError });
+    } else {
+      const next = { ...current, profiles: current.profiles.map(profile => profile.id === userId ? { ...profile, language: nextLanguage } : profile) };
+      try { await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify({ space: next, onboarded: true })); }
+      catch (error) { throw new Error(translate(language, 'language.failed'), { cause: error }); }
+    }
+    if (identityEpoch.current !== identityVersion || identity.current !== sessionId) return;
+    setSpace(previous => ({ ...previous, profiles: previous.profiles.map(profile => profile.id === userId ? { ...profile, language: nextLanguage } : profile) }));
+    setToast(translate(nextLanguage, sessionId ? 'language.saved' : 'language.savedLocal'));
+  };
   const switchPartner = () => {};
   const resetDemo = async () => { await AsyncStorage.multiRemove([STORAGE_KEY, ONBOARDING_STORAGE_KEY]); setDemoSpace(blankSpace()); setOnboarded(false); setToast('Space reset'); };
   const signOut = async () => { await checked(client().auth.signOut({ scope: 'local' })); };
@@ -456,6 +474,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         {
           id: sessionId ?? 'me',
           name: myDisplayName,
+          language: normalizeLanguage(current.profiles.find(profile => profile.id === userId)?.language),
           gender: finalizedOrigin.myGender,
           avatar: finalizedOrigin.myAvatar,
           mood: 'loved',
@@ -466,6 +485,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         {
           id: 'partner',
           name: partnerDisplayName,
+          language: normalizeLanguage(current.profiles.find(profile => profile.id !== userId)?.language),
           nickname: finalizedOrigin.partnerNickname.trim() || partnerDisplayName,
           gender: finalizedOrigin.partnerGender,
           avatar: finalizedOrigin.partnerAvatar,
@@ -1016,7 +1036,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     setToast(`Dispatched ${kind === 'journal' ? 'Shared Journal' : kind === 'instant-pic' ? 'Instant Pic' : 'Quick Note'} alert ♡`);
   };
 
-  return <Context.Provider value={{ space: current, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, completeOnboarding, updateOriginStory, generateConnectionCode, redeemConnectionCode, setMode, addStroke, undoStroke, clearCanvas, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, addAdventure, toggleAdventure, archiveAdventure, addJournalEntry, heartJournalEntry, addTriviaQuestion, guessTriviaQuestion, addQuickNote, updateQuickNoteText, heartQuickNote, pinQuickNote, deleteQuickNote, addErrand, toggleErrand, deleteErrand, clearDoneErrands, notifications: notificationOwner === (sessionId ?? 'local') ? notifications : [], notificationPrefs, notificationPermission, enableNotifications, updateNotificationPrefs, markNotificationRead, markAllNotificationsRead, triggerPartnerAlertPreview, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ space: current, language, setLanguage, userId, demo, ready, busy, error, toast, connection, session, onboarded, setup, completeOnboarding, updateOriginStory, generateConnectionCode, redeemConnectionCode, setMode, addStroke, undoStroke, clearCanvas, saveCanvas, startGame, playMove, submitQuiz, dismissError: () => setError(''), notify: setToast, run, setMood, sendMoment, heart, deleteMoment, savePlan, togglePlan, respondPlan, addAdventure, toggleAdventure, archiveAdventure, addJournalEntry, heartJournalEntry, addTriviaQuestion, guessTriviaQuestion, addQuickNote, updateQuickNoteText, heartQuickNote, pinQuickNote, deleteQuickNote, addErrand, toggleErrand, deleteErrand, clearDoneErrands, notifications: notificationOwner === (sessionId ?? 'local') ? notifications : [], notificationPrefs, notificationPermission, enableNotifications, updateNotificationPrefs, markNotificationRead, markAllNotificationsRead, triggerPartnerAlertPreview, sendMessage, loadEarlierMessages, adoptPet, carePet, renamePet, answer, updateProfile, switchPartner, resetDemo, refresh, signOut }}>{children}</Context.Provider>;
 }
 export function useSpace() { const value = useContext(Context); if (!value) throw new Error('SpaceProvider is missing'); return value; }
 export function usePeople() {

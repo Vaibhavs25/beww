@@ -1,3 +1,4 @@
+import type { Language } from './locales.ts';
 export type MoodId = 'happy' | 'loved' | 'calm' | 'low' | 'stressed' | 'missing' | 'space';
 export type Mood = { id: MoodId; label: string; emoji: string; color: string; background: string; title: string; subtitle: string; action: string; note: string };
 
@@ -36,7 +37,7 @@ export type CoupleOriginStory = {
   legalAcceptedAt?: string;
   legalVersion?: string;
 };
-export type Profile = { id: string; name: string; nickname?: string; gender?: GenderId; avatar?: string; mood: MoodId; moodNote: string; need: string; moodAt: string };
+export type Profile = { id: string; name: string; language?: Language; nickname?: string; gender?: GenderId; avatar?: string; mood: MoodId; moodNote: string; need: string; moodAt: string };
 export type MoodLog = { authorId: string; day: string; mood: MoodId; note: string; need: string; createdAt: string };
 export type Stroke = { id: string; authorId: string; color: string; width: number; points: number[][] };
 export type Moment = { id: string; authorId: string; kind: 'photo' | 'note' | 'hug' | 'drawing'; text: string; image?: string; drawing?: Stroke[]; storagePath?: string; createdAt: string; hearts: string[] };

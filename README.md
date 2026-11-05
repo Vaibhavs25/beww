@@ -22,6 +22,7 @@ The [GitHub import audit](docs/GEMINI_IMPORT_AUDIT.md) records the tested Gemini
 | --- | --- |
 | Nearby or long-distance | Onboarding choice; change it later in Our space. |
 | First dashboard tour | Two coach marks highlight Stick Note and Instant Snap, automatically scroll each button into view, and offer Next, Back, Skip, and keyboard/Android-back dismissal. Completion is remembered on this device for the account or local space. |
+| Language settings | English/Hindi toggle in Us. Signed-in preferences live on the user's Supabase profile; local previews persist on this device. Translates navigation, settings, the home greeting/date, and the dashboard guide. Each partner chooses independently. See [language settings](docs/LANGUAGE_SETTINGS.md) for coverage. |
 | Mood and support | Seven moods, a short note, and what would help. The partner's home adapts to the shared mood; it expires after 24 hours. |
 | Private chat | A dedicated Chat tab with text messages, timestamps, earlier-message loading, and retry without duplicate sends. Each partner speaks as their own account. |
 | A shared pet | Adopt a teddy, cat, puppy, or bunny; choose a name and raise it together. Feeding, play, and rest each earn five points once per partner per shared day. Every thirty points adds a level; no progress is lost for missed days. |
@@ -38,7 +39,7 @@ Photos, moods, drawing strokes, game turns, and other shared content have Supaba
 
 ## Backend
 
-The existing organization contains the `closer` project in Mumbai (`ap-south-1`), project ref `qsdjhpegxarubhmzvnoa`. Six migrations and the `call-ice` Edge Function have been applied. The local `.env` is configured and ignored by Git.
+The existing organization contains the `closer` project in Mumbai (`ap-south-1`), project ref `qsdjhpegxarubhmzvnoa`. Seven migrations and the `call-ice` Edge Function have been applied. The local `.env` is configured and ignored by Git.
 
 For a separate checkout, copy `.env.example` to `.env` and supply the project's URL and **publishable** key. Only those public values belong in the app. Service-role keys, SMTP credentials, and TURN secrets must stay server-side. Expo inlines `EXPO_PUBLIC_*` values into the app bundle; see [Expo environment variables](https://docs.expo.dev/eas/environment-variables/).
 
@@ -50,6 +51,7 @@ Migration history:
 - `20261103134634_chat_pet_date_planning.sql`: private couple chat, shared pets and once-daily care, and date details/confirmations. Applied and verified against the hosted database; earlier data is preserved.
 - `20261104033303_daily_mood_history.sql`: daily mood history, server-owned shared days, and individual streak counts.
 - `20261104171203_six_digit_space_invitation.sql`: verified, rate-limited six-digit invitations and one-time account linking. Applied with the user's approval and tested with rolled-back identities.
+- `20261105034850_profile_language_preference.sql`: per-profile English/Hindi preference, safe defaults, validation, and owner-only updates.
 
 All exposed application tables use row-level security. Anonymous requests cannot read profiles or issue pairing RPCs. Public RPCs are invoker wrappers over restricted private operations. Photo links expire. This is access-controlled storage, **not end-to-end encryption**; project administrators retain backend access.
 

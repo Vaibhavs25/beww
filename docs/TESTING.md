@@ -21,17 +21,20 @@ npm run test:ui
 npm run test:client
 npm run test:layout
 npm run test:coach-marks
+npm run test:language
 npm run test:config
 npm run test:backend
 ```
 
 The browser suites use installed Chrome through Playwright. `test:ui` covers local storage and UI behavior; `test:client` uses controlled HTTP/Auth/media responses. `test:layout` checks 21 actual routes at 360px and does not count a redirect to onboarding as testing the intended screen.
 
-`npm test` applies all six real migrations to PGlite with minimal Supabase-compatible scaffolding. Hosted tests are separate: `test:backend` verifies anonymous denial through the Data API and calling endpoint; `tests/hosted-features.sql` runs as the database administrator inside a rolled-back transaction. It creates no permanent test accounts.
+`npm test` applies all seven real migrations to PGlite with minimal Supabase-compatible scaffolding. Hosted tests are separate: `test:backend` verifies anonymous denial through the Data API and calling endpoint; `tests/hosted-features.sql` runs as the database administrator inside a rolled-back transaction. It creates no permanent test accounts.
 
 `npm run dev:native` starts Expo development mode. Android/iOS export checks JavaScript and Hermes compatibility; `test:config` introspects native settings. Neither produces an installed, signed app or verifies real camera, microphone, email, push, or WebRTC transport.
 
 Artifacts, screenshots, temporary reports, and exports are written to ignored `artifacts/`. The import audit records the baseline verification. With the dashboard coach marks, `npm test` has 51 tests, and `test:coach-marks` adds seven browser scenarios alongside the existing 19 UI scenarios and 21 route checks.
+
+The language update brings `npm test` to 55 tests. `test:language` verifies local and profile-backed language persistence, Hindi layout/navigation/tour, failed saves, per-account isolation, and a separate browser session. See [language settings](LANGUAGE_SETTINGS.md) for translation coverage and hosted verification.
 
 The tour suite checks first dashboard entry from another route, scrolling to the real target buttons, Next/Back, desktop/phone/landscape placement, background scroll blocking, Skip, completion across reloads, independent local-space markers, Escape, and normal note posting after dismissal. It verifies that the tour never posts content or opens the photo picker. Four pure tests cover bounded layout and separate account keys.
 
